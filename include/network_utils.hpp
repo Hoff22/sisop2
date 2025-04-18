@@ -25,9 +25,9 @@ namespace hun {
 		gateKeeper();
 		~gateKeeper();
 
-		int bindTo(uint32_t ipv4, uint16_t port);
-		int send(uint32_t ipv4, uint16_t port, const char* data, uint32_t size);
-		int receive(uint32_t ipv4, uint16_t port, portMessage* res);
+		int bindTo(const uint32_t ipv4, const uint16_t port);
+		int send(const uint32_t ipv4, const uint16_t port, const char* data, const uint32_t size);
+		int receive(const uint32_t ipv4, const uint16_t port, portMessage* res);
 		int listen(portMessage* res);
 	};
 }

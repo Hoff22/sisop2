@@ -19,7 +19,7 @@ const char *hello = "Hello from client";
 const char *hello_s = "Hello from server";  
 const uint32_t hello_size = 17;
 
-int extractInt(uint8_t* buffer){
+int extractInt(const uint8_t* buffer){
     int res = ((int)buffer[0] << 24) + ((int)buffer[1] << 16) + ((int)buffer[2] << 8) + ((int)buffer[3] << 0);
     return res;
 }
