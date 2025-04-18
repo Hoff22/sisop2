@@ -6,7 +6,10 @@ CXXFLAGS = -O2 -Wall -Wextra -Wshadow -Wno-unused-result -Wno-sign-compare -fsan
 all: server client
 
 server: src/server.cpp
-	$(CXX) $(CXXVER) $(CXXFLAGS) -o server server.cpp
+	$(CXX) $(CXXVER) $(CXXFLAGS) -o bin/server src/server.cpp
 
 client: src/client.cpp
-	$(CXX) $(CXXVER) $(CXXFLAGS) -o client client.cpp
+	$(CXX) $(CXXVER) $(CXXFLAGS) -o bin/client src/client.cpp
+
+clean:
+	rm -rf bin/*

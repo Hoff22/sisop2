@@ -1,14 +1,15 @@
-#include <bits/stdc++.h>
+#pragma once
+#include <cassert>
 #include <chrono>
 #include <ctime>  
-#include <stdlib.h> 
+#include <cstdlib>
 #include <unistd.h> 
-#include <string.h> 
+#include <cstring>
 #include <sys/types.h> 
-#include <sys/socket.h> 
+#include <sys/socket.h>
 #include <arpa/inet.h> 
 #include <netinet/in.h> 
-#include <errno.h> 
+#include <cerrno>
 
 namespace hun{
 
@@ -102,7 +103,7 @@ namespace hun{
 			sv_info.sin_port = port;
 			sv_info.sin_addr.s_addr = ipv4;
 
-			int res = bind(this->sockfd, (const struct sockaddr *)&sv_info, sizeof(sv_info));
+			int res = ::bind(this->sockfd, (const struct sockaddr *)&sv_info, sizeof(sv_info));
 
 			if(res < 0){
 		    	std::cerr << "[ERR] failed to bind: " << strerror(errno) << std::endl;
