@@ -2,7 +2,7 @@
 #include <chrono>
 #include <thread>
 
-#include "debug_utils.hpp"
+#include "../debug_utils.hpp"
 
 
 using namespace std;

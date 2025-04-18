@@ -7,8 +7,8 @@
 #include <arpa/inet.h> 
 #include <netinet/in.h> 
 
-#include "debug_utils.hpp"
-#include "network_utils.hpp"
+#include "../include/debug_utils.hpp"
+#include "../include/network_utils.hpp"
 
 using namespace std;
 
