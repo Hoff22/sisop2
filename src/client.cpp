@@ -42,17 +42,17 @@ int main(int argc, char** argv) {
     // find server routine:
     gk.send(htonl(INADDR_ANY), htons(PORT), hello, hello_size);
     hun::portMessage pm;
-    int n = gk.recieve(htonl(INADDR_ANY), htons(PORT), &pm);
+    int n = gk.receive(htonl(INADDR_ANY), htons(PORT), &pm);
 
-    cout << "LAST_RECIEVED: " << endl << "  address:\t" << hun::IPv4addrToString(gk.last_recieved.address) << endl << "  port:\t\t" << htons(gk.last_recieved.port) << endl;
+    cout << "LAST_receiveD: " << endl << "  address:\t" << hun::IPv4addrToString(gk.last_received.address) << endl << "  port:\t\t" << htons(gk.last_received.port) << endl;
 
     pm.buffer[n] = '\0'; 
     std::cout<<"Server: "<<pm.buffer<<std::endl; 
 
     if(strcmp(pm.buffer, hello_s) == 0){
         cout << "connected!" << endl << endl;
-        server_address = gk.last_recieved.address;
-        server_port = gk.last_recieved.port;
+        server_address = gk.last_received.address;
+        server_port = gk.last_received.port;
     }
     else{
         std::cerr << "[ERR] failed to connect to server" << std::endl;
@@ -71,7 +71,7 @@ int main(int argc, char** argv) {
         x = htonl(x);
         gk.send(server_address, server_port, (const char*)&x, sizeof(x));
 
-        n = gk.recieve(server_address, server_port, &pm);
+        n = gk.receive(server_address, server_port, &pm);
 
         pm.buffer[n] = '\0'; 
         std::cout<<"Server: "<<pm.buffer<<std::endl; 
