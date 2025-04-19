@@ -1,41 +1,44 @@
-#include <cstdlib>
-#include <unistd.h>
-#include <sys/types.h> 
-#include <sys/socket.h> 
-#include <arpa/inet.h> 
-#include <netinet/in.h> 
+#include "../include/Server.hpp"
+#include "../include/UdpSocket.hpp"
+#include "../include/Packet.hpp"
+#include <iostream>
+#include <thread>
+#include <vector>
+#include <arpa/inet.h>
 
-#include "../include/debug_utils.hpp"
-#include "../include/network_utils.hpp"
+Server::Server(std::shared_ptr<ISocket> socket,
+               std::shared_ptr<IDiscoveryService> discovery,
+               std::shared_ptr<IProcessingService> processing)
+    : socket(socket), discoveryService(discovery), processingService(processing) {}
 
-using namespace std;
+void Server::start() {
+    // Start the discovery service in a separate thread
+    std::thread discoveryThread(&Server::startDiscovery, this);
 
-#define PORT    8080
-   
-const char *hello = "Hello from server";
+    // Main loop to receive requests and process them
+    while (true) {
+        sockaddr_in clientAddr;
+        std::vector<uint8_t> data = socket->receiveFrom(clientAddr);
 
-constexpr uint32_t hello_size = 17;
+        if (data.empty()) {
+            continue;
+        }
 
-int extractInt(const uint8_t *buffer) {
-	int res = (static_cast<int>(buffer[0]) << 24) + (static_cast<int>(buffer[1]) << 16) + (
-		          static_cast<int>(buffer[2]) << 8) + (static_cast<int>(buffer[3]) << 0);
-	return res;
+        try {
+            Packet packet = Packet::deserialize(data);
+
+            if (packet.type == PacketType::REQUEST) {
+                processingService->handleRequest(packet, clientAddr);
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "[ERROR] Failed to deserialize packet: " << e.what() << std::endl;
+        }
+    }
+
+    // Never reached, but clean exit if needed
+    discoveryThread.join();
 }
 
-long long sum = 0;
-
-// Driver code 
-int main(int argc, char** argv) { 
-
-	hut::printList(hut::readArgs(argc, argv));
-	cout << endl;
-
-	hun::portMessage pm;
-	hun::gateKeeper gk;
-	gk.bindTo(htonl(INADDR_ANY), htons(PORT));
-	while(gk.listen(&pm)){
-		int data = extractInt((uint8_t*)pm.buffer);
-		std::cout << "message data: " << data << std::endl;
-		gk.send(pm.addr.sin_addr.s_addr, pm.addr.sin_port, hello, hello_size);
-	}
+void Server::startDiscovery() {
+    discoveryService->listenForDiscoveryRequests();
 }

@@ -1,37 +1,36 @@
-#include <chrono>
 #include <iostream>
-#include <thread>
 
-#include "../include/debug_utils.hpp"
+#include "../include/Server.hpp"
+#include "../include/UdpSocket.hpp"
 
-using namespace std;
+// Placeholder stubs for now — you’ll implement them shortly
+class DummyDiscovery : public IDiscoveryService {
+public:
+	sockaddr_in findServer() override { return {}; }
+	void listenForDiscoveryRequests() override {}
+};
 
-int k = 0;
+class DummyProcessing : public IProcessingService {
+public:
+	void handleRequest(const Packet& request, const sockaddr_in& addr) override {}
+};
 
-void in_k(){
-	cin >> k;
-	cout << "[thread 2] k is " << k << endl;
-}
-
-int main(int argc, char** argv){
-
-	hut::printList(hut::readArgs(argc, argv));
-	cout << endl;
-
-	auto th = thread(in_k);
-
-	int num = 0;
-	int dir = 1;
-	while(!k){
-		cout << "[thread 1] k is";
-		for(int i = 0; i < num; i++) cout << " ";
-		cout <<"zero" << endl;
-		num+=dir;
-		if(num == 10) dir*=-1;
-		if(num == 0) dir *=-1;
+int main(int argc, char* argv[]) {
+	if (argc != 2) {
+		std::cerr << "Usage: ./server <port>\n";
+		return 1;
 	}
 
-	th.join();
+	uint16_t port = static_cast<uint16_t>(std::stoi(argv[1]));
+
+	auto socket = std::make_shared<UdpSocket>();
+	auto discovery = std::make_shared<DummyDiscovery>();
+	auto processing = std::make_shared<DummyProcessing>();
+
+	socket->bind(port);
+
+	Server server(socket, discovery, processing);
+	server.start();
 
 	return 0;
 }
