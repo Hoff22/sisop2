@@ -55,8 +55,12 @@ std::vector<uint8_t> UdpSocket::receiveFrom(sockaddr_in& from) {
     std::vector<uint8_t> buffer(1024);
     socklen_t from_len = sizeof(from);
 
+    std::cout << "[UDP] Waiting to receive...\n" << std::flush;
     ssize_t bytes_received = recvfrom(sockfd, buffer.data(), buffer.size(), 0,
                                       reinterpret_cast<sockaddr*>(&from), &from_len);
+    std::cout << "[UDP] Bytes received: " << bytes_received << "\n";
+
+    
     if (bytes_received < 0) {
         perror("recvfrom");
         std::cerr << "Failed to receive data\n";

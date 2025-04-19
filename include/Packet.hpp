@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#include <cstdint>
 
 enum class PacketType : uint16_t {
     DISCOVERY = 1,

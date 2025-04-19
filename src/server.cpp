@@ -13,10 +13,12 @@ Server::Server(std::shared_ptr<ISocket> socket,
 
 void Server::start() {
     // Start the discovery service in a separate thread
-    std::thread discoveryThread(&Server::startDiscovery, this);
+    //std::thread discoveryThread(&Server::startDiscovery, this);
+    startDiscovery();
 
     // Main loop to receive requests and process them
     while (true) {
+        std::cout << "[SERVER] Listening for requests..." << std::endl;
         sockaddr_in clientAddr;
         std::vector<uint8_t> data = socket->receiveFrom(clientAddr);
 
@@ -36,9 +38,10 @@ void Server::start() {
     }
 
     // Never reached, but clean exit if needed
-    discoveryThread.join();
+    //discoveryThread.join();
 }
 
 void Server::startDiscovery() {
+    std::cout << "[DISCOVERY] Starting discovery service..." << std::endl;
     discoveryService->listenForDiscoveryRequests();
 }

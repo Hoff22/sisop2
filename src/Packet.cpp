@@ -2,6 +2,9 @@
 #include "../include/endian_utils.hpp"
 #include <cstring>
 #include <stdexcept>
+#include <cstdint>
+#include <arpa/inet.h>
+
 
 Packet::Packet(const PacketType type, const uint32_t seqn) : type(type), seqn(seqn) {
     // Initialize union manually as needed
