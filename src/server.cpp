@@ -1,25 +1,31 @@
-#include "../include/Server.hpp"
-#include "../include/UdpSocket.hpp"
-#include "../include/Packet.hpp"
-#include <iostream>
 #include <thread>
+#include <utility>
 #include <vector>
 #include <arpa/inet.h>
+#include <iostream>
+
+#include "../include/Logger.hpp"
+#include "../include/Packet.hpp"
+#include "../include/Server.hpp"
+#include "../include/UdpSocket.hpp"
+#include "../include/TimeUtils.hpp"
 
 Server::Server(std::shared_ptr<ISocket> socket,
                std::shared_ptr<IDiscoveryService> discovery,
                std::shared_ptr<IProcessingService> processing)
-    : socket(socket), discoveryService(discovery), processingService(processing) {}
+    : socket(std::move(socket)),
+      discoveryService(std::move(discovery)),
+      processingService(std::move(processing)) {
+}
 
-void Server::start() {
-    // Start the discovery service in a separate thread
-    //std::thread discoveryThread(&Server::startDiscovery, this);
-    startDiscovery();
+void Server::start() const {
+    std::cout << getFormattedTime() << " num_reqs 0 total_sum 0" << std::endl;
 
-    // Main loop to receive requests and process them
+    std::thread discoveryThread(&Server::startDiscovery, this);
+
     while (true) {
-        std::cout << "[SERVER] Listening for requests..." << std::endl;
-        sockaddr_in clientAddr;
+        LOG_INFO("[SERVER] Listening for requests...");
+        sockaddr_in clientAddr{};
         std::vector<uint8_t> data = socket->receiveFrom(clientAddr);
 
         if (data.empty()) {
@@ -27,21 +33,18 @@ void Server::start() {
         }
 
         try {
-            Packet packet = Packet::deserialize(data);
-
-            if (packet.type == PacketType::REQUEST) {
+            if (Packet packet = Packet::deserialize(data); packet.type == PacketType::REQUEST) {
                 processingService->handleRequest(packet, clientAddr);
             }
-        } catch (const std::exception& e) {
-            std::cerr << "[ERROR] Failed to deserialize packet: " << e.what() << std::endl;
+        } catch (const std::exception &e) {
+            LOG_ERROR(std::string("[SERVER] Failed to deserialize packet: ") + e.what());
         }
     }
 
-    // Never reached, but clean exit if needed
-    //discoveryThread.join();
+    discoveryThread.join();
 }
 
-void Server::startDiscovery() {
-    std::cout << "[DISCOVERY] Starting discovery service..." << std::endl;
+void Server::startDiscovery() const {
+    LOG_INFO("[DISCOVERY] Starting discovery service...");
     discoveryService->listenForDiscoveryRequests();
 }

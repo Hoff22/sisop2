@@ -14,6 +14,6 @@ public:
            std::shared_ptr<IDiscoveryService> discovery,
            std::shared_ptr<IProcessingService> processing);
 
-    void start();
-    void startDiscovery();
+    void start() const;
+    void startDiscovery() const;
 };

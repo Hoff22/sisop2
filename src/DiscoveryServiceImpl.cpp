@@ -1,30 +1,32 @@
-#include "../include/DiscoveryServiceImpl.hpp"
-#include "../include/Packet.hpp"
-#include <iostream>
-#include <arpa/inet.h>
-#include <thread>
 #include <chrono>
+#include <thread>
+#include <arpa/inet.h>
+#include "../include/Packet.hpp"
 
-DiscoveryServiceImpl::DiscoveryServiceImpl(std::shared_ptr<ISocket> sock) : socket(std::move(sock)) {}
+#include "../include/DiscoveryServiceImpl.hpp"
+#include "../include/Logger.hpp"
+
+DiscoveryServiceImpl::DiscoveryServiceImpl(std::shared_ptr<ISocket> sock) : socket(std::move(sock)) {
+}
 
 void DiscoveryServiceImpl::listenForDiscoveryRequests() {
     while (true) {
-        std::cout << "[DISCOVERY] Listening for discovery requests..." << std::endl;
- 
+        LOG_INFO("[DISCOVERY] Listening for discovery requests...");
+
         sockaddr_in clientAddr{};
         std::vector<uint8_t> data = socket->receiveFrom(clientAddr);
-        std::cout << "[DISCOVERY] Received " << data.size() << " bytes from "
-                  << inet_ntoa(clientAddr.sin_addr) << std::endl;
 
-        Packet packet = Packet::deserialize(data);
+        LOG_INFO("[DISCOVERY] Received " + std::to_string(data.size()) + " bytes from " +
+            std::string(inet_ntoa(clientAddr.sin_addr)));
+
+        const Packet packet = Packet::deserialize(data);
         if (packet.type == PacketType::DISCOVERY) {
-            std::cout << "[DISCOVERY] Received from: " << inet_ntoa(clientAddr.sin_addr) << std::endl;
+            LOG_INFO("[DISCOVERY] Discovery packet from: " + std::string(inet_ntoa(clientAddr.sin_addr)));
 
             Packet ack(PacketType::DISCOVERY_ACK, 0);
             auto response = ack.serialize();
             socket->sendTo(response, clientAddr);
         }
-
     }
 }
 
