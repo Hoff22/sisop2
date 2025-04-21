@@ -1,16 +1,17 @@
-#pragma once
-
 #include "IProcessingService.hpp"
 #include "ISocket.hpp"
-#include "Packet.hpp"
-#include "ClientTable.hpp"
-#include <memory>
+#include "TableService.hpp"
 
 class ProcessingServiceImpl : public IProcessingService {
-    std::shared_ptr<ISocket> socket;
-    ClientTable clientTable;
-
 public:
-    explicit ProcessingServiceImpl(std::shared_ptr<ISocket> socket);
+    ProcessingServiceImpl(std::shared_ptr<ISocket> socket,
+                          std::shared_ptr<TableService> table);
+
     void handleRequest(const Packet& request, const sockaddr_in& addr) override;
+
+private:
+    std::shared_ptr<ISocket> socket;
+    std::shared_ptr<TableService> table;
+    std::atomic<uint64_t> totalRequests = 0;
+    std::atomic<uint64_t> totalSum = 0;
 };

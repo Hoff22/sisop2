@@ -1,59 +1,45 @@
-#include <atomic>
-#include <iostream>
-#include <string>
+#include "../include/ProcessingServiceImpl.hpp"
+#include "../include/TimeUtils.hpp"
 #include <arpa/inet.h>
 
-#include "../include/ProcessingServiceImpl.hpp"
-#include "../include/Logger.hpp"
-#include "../include/TimeUtils.hpp"
+#include "../include/Client.hpp"
 
-static std::atomic<uint64_t> totalRequests = 0;
-static std::atomic<uint64_t> totalSum = 0;
-
-ProcessingServiceImpl::ProcessingServiceImpl(std::shared_ptr<ISocket> socket)
-    : socket(std::move(socket)) {}
+ProcessingServiceImpl::ProcessingServiceImpl(std::shared_ptr<ISocket> socket,
+                                             std::shared_ptr<TableService> table)
+    : socket(std::move(socket)), table(std::move(table)) {}
 
 void ProcessingServiceImpl::handleRequest(const Packet& request, const sockaddr_in& addr) {
     const uint32_t ip = addr.sin_addr.s_addr;
     const uint16_t port = ntohs(addr.sin_port);
 
-    ClientInfo& info = clientTable.getOrInsert(ip, port);
+    const bool isDup = table->isDuplicate(ip, port, request.seqn);
 
-    const std::string now = getFormattedTime();
-    const std::string client_ip = std::string(inet_ntoa(addr.sin_addr));
+    //TODO change this to be done only by the discovery service
+    ClientInfo &info = table->getOrInsert(ip, port);
 
-    if (request.seqn <= info.last_sequence) {
-        // Resend old response
-        Packet ack(PacketType::REQUEST_ACK, request.seqn);
-        ack.ack.total_sum = info.last_sum;
-        ack.ack.num_requests = totalRequests.load();
+    uint32_t ackSeqn;
+    uint64_t ackSum;
 
-        std::cout << now << " client " << client_ip
-                  << " DUP!! id_req " << request.seqn
-                  << " value " << request.request.value
-                  << " num_reqs " << totalRequests
-                  << " total_sum " << totalSum << std::endl;
+    if (isDup) {
+        // Req with seqn already processed, send latest state to the client
+        ackSeqn = info.last_sequence;
+        ackSum  = info.last_sum;
 
-        socket->sendTo(ack.serialize(), addr);
-        return;
+        // Notify InterfaceService with flag isDuplicate
+        table->update(ip, port, request.seqn, ackSum, request.request.value);  // não altera estado real
+    } else {
+        ++totalRequests;
+        totalSum += request.request.value;
+
+        ackSeqn = request.seqn;
+        ackSum = totalSum;
+
+        table->update(ip, port, ackSeqn, ackSum, request.request.value);
     }
 
-    // update state
-    info.last_sum += request.request.value;
-    info.last_sequence = request.seqn;
-
-    ++totalRequests;
-    totalSum += request.request.value;
-
-    Packet ack(PacketType::REQUEST_ACK, request.seqn);
-    ack.ack.total_sum = totalSum;
+    Packet ack(PacketType::REQUEST_ACK, ackSeqn);
+    ack.ack.total_sum = ackSum;
     ack.ack.num_requests = totalRequests;
-
-    std::cout << now << " client " << client_ip
-              << " id_req " << request.seqn
-              << " value " << request.request.value
-              << " num_reqs " << totalRequests
-              << " total_sum " << totalSum << std::endl;
 
     socket->sendTo(ack.serialize(), addr);
 }

@@ -15,13 +15,15 @@ Server::Server(std::shared_ptr<ISocket> socket,
                std::shared_ptr<IProcessingService> processing)
     : socket(std::move(socket)),
       discoveryService(std::move(discovery)),
-      processingService(std::move(processing)) {
+      processingService(std::move(processing)),
+      dispatcher(processingService, 4) {
 }
 
-void Server::start() const {
+void Server::start() {
     std::cout << getFormattedTime() << " num_reqs 0 total_sum 0" << std::endl;
 
     std::thread discoveryThread(&Server::startDiscovery, this);
+    dispatcher.start();
 
     while (true) {
         LOG_INFO("[SERVER] Listening for requests...");
@@ -34,7 +36,8 @@ void Server::start() const {
 
         try {
             if (Packet packet = Packet::deserialize(data); packet.type == PacketType::REQUEST) {
-                processingService->handleRequest(packet, clientAddr);
+                //processingService->handleRequest(packet, clientAddr);
+                dispatcher.enqueue(packet, clientAddr);
             }
         } catch (const std::exception &e) {
             LOG_ERROR(std::string("[SERVER] Failed to deserialize packet: ") + e.what());

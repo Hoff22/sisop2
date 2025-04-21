@@ -5,10 +5,12 @@
 #include <cstdint>
 #include <arpa/inet.h>
 
-
 Packet::Packet(const PacketType type, const uint32_t seqn) : type(type), seqn(seqn) {
     // Initialize union manually as needed
     std::memset(&request, 0, sizeof(request));
+}
+
+Packet::Packet() : type(PacketType::OTHER), seqn(0), request({}) {
 }
 
 std::vector<uint8_t> Packet::serialize() const {

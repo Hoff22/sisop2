@@ -7,6 +7,8 @@
 #include "../include/DiscoveryServiceImpl.hpp"
 #include "../include/ProcessingServiceImpl.hpp"
 #include "../include/Logger.hpp"
+#include "../include/InterfaceService.hpp"
+#include "../include/TableService.hpp"
 
 int main(int argc, char* argv[]) {
     if (argc != 2) {
@@ -24,10 +26,13 @@ int main(int argc, char* argv[]) {
         auto socket = std::make_shared<UdpSocket>();
         socket->bind(port);
 
-        const auto discovery = std::make_shared<DiscoveryServiceImpl>(socket);
-        const auto processing = std::make_shared<ProcessingServiceImpl>(socket);
+        auto interface = std::make_shared<InterfaceService>();
+        auto table = std::make_shared<TableService>(interface);
 
-        const Server server(socket, discovery, processing);
+        const auto discovery = std::make_shared<DiscoveryServiceImpl>(socket, table);
+        const auto processing = std::make_shared<ProcessingServiceImpl>(socket, table);
+
+        Server server(socket, discovery, processing);
         server.start();
 
     } catch (const std::exception& e) {

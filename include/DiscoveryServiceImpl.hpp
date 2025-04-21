@@ -1,13 +1,16 @@
-#pragma once
 #include "IDiscoveryService.hpp"
 #include "ISocket.hpp"
-#include <memory>
+#include "TableService.hpp"
 
 class DiscoveryServiceImpl : public IDiscoveryService {
-    std::shared_ptr<ISocket> socket;
-
 public:
-    explicit DiscoveryServiceImpl(std::shared_ptr<ISocket> sock);
+    DiscoveryServiceImpl(std::shared_ptr<ISocket> socket,
+                         std::shared_ptr<TableService> table);
+
     void listenForDiscoveryRequests() override;
-    sockaddr_in findServer() override; // Not used on server, just a stub
+    sockaddr_in findServer() override;
+
+private:
+    std::shared_ptr<ISocket> socket;
+    std::shared_ptr<TableService> table;
 };
