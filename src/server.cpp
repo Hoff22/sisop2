@@ -1,41 +1,41 @@
-#include <cstdlib>
-#include <unistd.h>
-#include <sys/types.h> 
-#include <sys/socket.h> 
-#include <arpa/inet.h> 
-#include <netinet/in.h> 
+#include <thread>
+#include <utility>
+#include <vector>
+#include <arpa/inet.h>
+#include <iostream>
 
-#include "../include/debug_utils.hpp"
-#include "../include/network_utils.hpp"
+#include "../include/Packet.hpp"
+#include "../include/Server.hpp"
+#include "../include/UdpSocket.hpp"
+#include "../include/TimeUtils.hpp"
 
-using namespace std;
-
-#define PORT    8080
-   
-const char *hello = "Hello from server";
-
-constexpr uint32_t hello_size = 17;
-
-int extractInt(const uint8_t *buffer) {
-	int res = (static_cast<int>(buffer[0]) << 24) + (static_cast<int>(buffer[1]) << 16) + (
-		          static_cast<int>(buffer[2]) << 8) + (static_cast<int>(buffer[3]) << 0);
-	return res;
+Server::Server(std::shared_ptr<ISocket> socket,
+               std::shared_ptr<IDiscoveryService> discovery,
+               std::shared_ptr<IProcessingService> processing)
+    : socket(std::move(socket)),
+      discoveryService(std::move(discovery)),
+      processingService(std::move(processing)),
+      dispatcher(processingService, discoveryService, 4) {
 }
 
-long long sum = 0;
+void Server::start() {
+    std::cout << getFormattedTime() << " num_reqs 0 total_sum 0" << std::endl;
 
-// Driver code 
-int main(int argc, char** argv) { 
+    dispatcher.start();
 
-	hut::printList(hut::readArgs(argc, argv));
-	cout << endl;
+    while (true) {
+        sockaddr_in clientAddr{};
+        std::vector<uint8_t> data = socket->receiveFrom(clientAddr);
 
-	hun::portMessage pm;
-	hun::gateKeeper gk;
-	gk.bindTo(htonl(INADDR_ANY), htons(PORT));
-	while(gk.listen(&pm)){
-		int data = extractInt((uint8_t*)pm.buffer);
-		std::cout << "message data: " << data << std::endl;
-		gk.send(pm.addr.sin_addr.s_addr, pm.addr.sin_port, hello, hello_size);
-	}
+        if (data.empty()) {
+            continue;
+        }
+
+        try {
+            Packet packet = Packet::deserialize(data);
+            dispatcher.enqueue(packet, clientAddr);
+        } catch (const std::exception &e) {
+            std::cerr << "Failed to deserialize packet: " << e.what() << std::endl;
+        }
+    }
 }
