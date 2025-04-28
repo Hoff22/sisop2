@@ -107,7 +107,7 @@ void Client::startPrinter() {
             while (!printQueue.empty()) {
                 auto [ack, value] = printQueue.front();
                 printQueue.pop();
-                lock.unlock(); // Unlock while printing
+                lock.unlock();
 
                 std::cout << getFormattedTime()
                           << " server " << inet_ntoa(serverAddr.sin_addr)
@@ -117,7 +117,7 @@ void Client::startPrinter() {
                           << " total_sum " << ack.ack.total_sum
                           << std::endl;
 
-                lock.lock(); // Re-lock for queue access
+                lock.lock();
             }
         }
     });
