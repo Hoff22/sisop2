@@ -49,6 +49,7 @@ bool Client::connectToServer(const uint16_t port) {
 }
 
 void Client::run() {
+    startPrinter();
     int value;
 
     while (std::cin >> value) {
@@ -68,7 +69,6 @@ void Client::run() {
                 continue;
             }
 
-            // TODO: change the task of out putting to cout to another thread
             try {
                 const Packet ack = Packet::deserialize(response);
 
@@ -77,17 +77,13 @@ void Client::run() {
                     continue;
                 }
 
-                if (ack.seqn == sequence) {
-                    std::cout << getFormattedTime()
-                            << " server " << inet_ntoa(serverAddr.sin_addr)
-                            << " id_req " << ack.seqn
-                            << " value " << value
-                            << " num_reqs " << ack.ack.num_requests
-                            << " total_sum " << ack.ack.total_sum << std::endl;
+                if (ack.seqn == sequence || ack.seqn > sequence) {
+                    {
+                        std::lock_guard<std::mutex> lock(printMutex);
+                        printQueue.emplace(ack, value);
+                    }
+                    printCond.notify_one();
 
-                    acknowledged = true;
-                    sequence++;
-                } else if (ack.seqn > sequence) {
                     acknowledged = true;
                     sequence++;
                 }
@@ -97,4 +93,44 @@ void Client::run() {
             }
         }
     }
+
+    stopPrinter();
 }
+
+void Client::startPrinter() {
+    printRunning = true;
+    printThread = std::thread([this]() {
+        while (printRunning) {
+            std::unique_lock<std::mutex> lock(printMutex);
+            printCond.wait(lock, [this]() { return !printQueue.empty() || !printRunning; });
+
+            while (!printQueue.empty()) {
+                auto [ack, value] = printQueue.front();
+                printQueue.pop();
+                lock.unlock(); // Unlock while printing
+
+                std::cout << getFormattedTime()
+                          << " server " << inet_ntoa(serverAddr.sin_addr)
+                          << " id_req " << ack.seqn
+                          << " value " << value
+                          << " num_reqs " << ack.ack.num_requests
+                          << " total_sum " << ack.ack.total_sum
+                          << std::endl;
+
+                lock.lock(); // Re-lock for queue access
+            }
+        }
+    });
+}
+
+void Client::stopPrinter() {
+    {
+        std::lock_guard<std::mutex> lock(printMutex);
+        printRunning = false;
+    }
+    printCond.notify_all();
+    if (printThread.joinable()) {
+        printThread.join();
+    }
+}
+
