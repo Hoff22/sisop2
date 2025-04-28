@@ -6,7 +6,6 @@
 #include "../include/UdpSocket.hpp"
 #include "../include/DiscoveryServiceImpl.hpp"
 #include "../include/ProcessingServiceImpl.hpp"
-#include "../include/Logger.hpp"
 #include "../include/InterfaceService.hpp"
 #include "../include/TableService.hpp"
 
@@ -15,10 +14,6 @@ int main(int argc, char* argv[]) {
         std::cerr << "Usage: ./server <port>\n";
         return 1;
     }
-
-    const std::string log_file = "server_" + std::to_string(getpid()) + ".log";
-    Logger::init(log_file);
-    LOG_INFO("Server started.");
 
     uint16_t port = static_cast<uint16_t>(std::stoi(argv[1]));
 

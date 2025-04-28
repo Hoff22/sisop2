@@ -3,7 +3,6 @@
 #include <arpa/inet.h>
 
 #include "../include/Client.hpp"
-#include "../include/Logger.hpp"
 #include "../include/TimeUtils.hpp"
 
 
@@ -21,12 +20,10 @@ bool Client::discover(uint16_t port) {
     broadcastAddr.sin_port = htons(port);
     broadcastAddr.sin_addr.s_addr = inet_addr("255.255.255.255");
 
-    LOG_INFO("[CLIENT] Broadcasting discovery...");
     socket->sendTo(data, broadcastAddr);
 
     const std::vector<uint8_t> response = socket->receiveFrom(serverAddr);
     if (response.empty()) {
-        LOG_WARN("[CLIENT] Discovery timed out.");
         return false;
     }
 
@@ -37,7 +34,7 @@ bool Client::discover(uint16_t port) {
             return true;
         }
     } catch (...) {
-        LOG_ERROR("[CLIENT] Failed to parse discovery response.");
+        std::cerr << "Failed to parse discovery response." << std::endl;
     }
 
     return false;
@@ -46,7 +43,6 @@ bool Client::discover(uint16_t port) {
 bool Client::connectToServer(const uint16_t port) {
     for (int attempt = 0; attempt < 10; ++attempt) {
         if (discover(port)) return true;
-        LOG_WARN("[CLIENT] Retry discovery...");
         sleep(1);
     }
     return false;
@@ -69,21 +65,19 @@ void Client::run() {
             std::vector<uint8_t> response = socket->receiveFrom(replyAddr);
 
             if (response.empty()) {
-                LOG_WARN("[CLIENT] Timeout. Retrying...");
                 continue;
             }
 
+            // TODO: change the task of out putting to cout to another thread
             try {
                 const Packet ack = Packet::deserialize(response);
 
                 if (ack.type != PacketType::REQUEST_ACK) {
-                    LOG_WARN("[CLIENT] Invalid response type.");
+                    std::cerr << "Invalid response type." << std::endl;
                     continue;
                 }
 
                 if (ack.seqn == sequence) {
-                    LOG_INFO("[CLIENT] Server confirmed request #" + std::to_string(ack.seqn) +
-                        ", sum = " + std::to_string(ack.ack.total_sum));
                     std::cout << getFormattedTime()
                             << " server " << inet_ntoa(serverAddr.sin_addr)
                             << " id_req " << ack.seqn
@@ -93,18 +87,13 @@ void Client::run() {
 
                     acknowledged = true;
                     sequence++;
-                } else if (ack.seqn < sequence) {
-                    LOG_WARN("[CLIENT] Duplicate ACK received (ack.seqn=" + std::to_string(ack.seqn) +
-                        ", expected=" + std::to_string(sequence) + "). Resending request...");
-                } else {
-                    LOG_WARN("[CLIENT] Server already processed this request. Last confirmed: " +
-                        std::to_string(ack.seqn) + ". Aborting this request.");
+                } else if (ack.seqn > sequence) {
                     acknowledged = true;
                     sequence++;
                 }
 
             } catch (const std::exception& e) {
-                LOG_ERROR("[CLIENT] Failed to parse ACK: " + std::string(e.what()));
+                std::cerr << "Failed to parse ACK: " << e.what() << std::endl;
             }
         }
     }

@@ -4,7 +4,6 @@
 #include <arpa/inet.h>
 #include <iostream>
 
-#include "../include/Logger.hpp"
 #include "../include/Packet.hpp"
 #include "../include/Server.hpp"
 #include "../include/UdpSocket.hpp"
@@ -26,7 +25,6 @@ void Server::start() {
     dispatcher.start();
 
     while (true) {
-        LOG_INFO("[SERVER] Listening for requests...");
         sockaddr_in clientAddr{};
         std::vector<uint8_t> data = socket->receiveFrom(clientAddr);
 
@@ -40,7 +38,7 @@ void Server::start() {
                 dispatcher.enqueue(packet, clientAddr);
             }
         } catch (const std::exception &e) {
-            LOG_ERROR(std::string("[SERVER] Failed to deserialize packet: ") + e.what());
+            std::cerr << "Failed to deserialize packet: " << e.what() << std::endl;
         }
     }
 
@@ -48,6 +46,5 @@ void Server::start() {
 }
 
 void Server::startDiscovery() const {
-    LOG_INFO("[DISCOVERY] Starting discovery service...");
     discoveryService->listenForDiscoveryRequests();
 }
