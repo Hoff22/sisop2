@@ -9,8 +9,6 @@ class ITableOutputObserver {
 public:
     virtual ~ITableOutputObserver() = default;
 
-    virtual void onClientInserted(uint32_t ip, uint16_t port) = 0;
-
     virtual void onRequestProcessed(const std::string& timestamp,
                                     const std::string& clientIp,
                                     uint32_t seqn,

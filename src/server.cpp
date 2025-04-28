@@ -15,13 +15,12 @@ Server::Server(std::shared_ptr<ISocket> socket,
     : socket(std::move(socket)),
       discoveryService(std::move(discovery)),
       processingService(std::move(processing)),
-      dispatcher(processingService, 4) {
+      dispatcher(processingService, discoveryService, 4) {
 }
 
 void Server::start() {
     std::cout << getFormattedTime() << " num_reqs 0 total_sum 0" << std::endl;
 
-    std::thread discoveryThread(&Server::startDiscovery, this);
     dispatcher.start();
 
     while (true) {
@@ -33,18 +32,10 @@ void Server::start() {
         }
 
         try {
-            if (Packet packet = Packet::deserialize(data); packet.type == PacketType::REQUEST) {
-                //processingService->handleRequest(packet, clientAddr);
-                dispatcher.enqueue(packet, clientAddr);
-            }
+            Packet packet = Packet::deserialize(data);
+            dispatcher.enqueue(packet, clientAddr);
         } catch (const std::exception &e) {
             std::cerr << "Failed to deserialize packet: " << e.what() << std::endl;
         }
     }
-
-    discoveryThread.join();
-}
-
-void Server::startDiscovery() const {
-    discoveryService->listenForDiscoveryRequests();
 }

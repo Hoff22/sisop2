@@ -1,3 +1,4 @@
+#pragma once
 #include "IDiscoveryService.hpp"
 #include "ISocket.hpp"
 #include "TableService.hpp"
@@ -7,8 +8,7 @@ public:
     DiscoveryServiceImpl(std::shared_ptr<ISocket> socket,
                          std::shared_ptr<TableService> table);
 
-    void listenForDiscoveryRequests() override;
-    sockaddr_in findServer() override;
+    void handleRequest(const sockaddr_in &clientAddr) override;
 
 private:
     std::shared_ptr<ISocket> socket;

@@ -1,12 +1,16 @@
 #include "../include/InterfaceService.hpp"
 
 #include <iostream>
-#include <arpa/inet.h>
-#include <netinet/in.h>
 
-void InterfaceService::onClientInserted(uint32_t ip, uint16_t port) {
-    // This is optional — we can use it if the spec requires it
-    // std::cout << getFormattedTime() << " new client " << ip_str << ":" << port << std::endl;
+InterfaceService::InterfaceService() : worker(&InterfaceService::run, this) {}
+
+InterfaceService::~InterfaceService() {
+    {
+        std::lock_guard lock(mutex);
+        shutdown = true;
+    }
+    cv.notify_one();
+    worker.join();
 }
 
 void InterfaceService::onRequestProcessed(const std::string& timestamp,
@@ -16,12 +20,34 @@ void InterfaceService::onRequestProcessed(const std::string& timestamp,
                                           uint64_t numRequests,
                                           uint64_t totalSum,
                                           bool isDuplicate) {
-    std::cout << timestamp
-              << " client " << clientIp
-              << (isDuplicate ? " DUP!!" : "")
-              << " id_req " << seqn
-              << " value " << value
-              << " num_reqs " << numRequests
-              << " total_sum " << totalSum
-              << std::endl;
+    {
+        std::lock_guard lock(mutex);
+        queue.push(RequestInfo{timestamp, clientIp, seqn, value, numRequests, totalSum, isDuplicate});
+    }
+    cv.notify_one();
+}
+
+void InterfaceService::run() {
+    while (true) {
+        RequestInfo info;
+
+        {
+            std::unique_lock lock(mutex);
+            cv.wait(lock, [this] { return !queue.empty() || shutdown; });
+
+            if (shutdown && queue.empty()) break;
+
+            info = queue.front();
+            queue.pop();
+        }
+
+        std::cout << info.timestamp
+                  << " client " << info.clientIp
+                  << (info.isDuplicate ? " DUP!!" : "")
+                  << " id_req " << info.seqn
+                  << " value " << info.value
+                  << " num_reqs " << info.numRequests
+                  << " total_sum " << info.totalSum
+                  << std::endl;
+    }
 }

@@ -15,7 +15,7 @@ void ProcessingServiceImpl::handleRequest(const Packet& request, const sockaddr_
     const bool isDup = table->isDuplicate(ip, port, request.seqn);
 
     //TODO change this to be done only by the discovery service
-    ClientInfo &info = table->getOrInsert(ip, port);
+    const ClientInfo &info = table->getOrInsertClient(ip, port);
 
     uint32_t ackSeqn;
     uint64_t ackSum;

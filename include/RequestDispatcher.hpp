@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Packet.hpp"
+#include "IDiscoveryService.hpp"
 #include "IProcessingService.hpp"
 
 #include <thread>
@@ -10,13 +11,20 @@
 #include <vector>
 #include <atomic>
 
+
 class RequestDispatcher {
 public:
-    RequestDispatcher(std::shared_ptr<IProcessingService> processingService, size_t numThreads = 8);
+    RequestDispatcher(std::shared_ptr<IProcessingService> processingService,
+                      std::shared_ptr<IDiscoveryService> discoveryService,
+                      size_t numThreads = 8
+    );
+
     ~RequestDispatcher();
 
-    void enqueue(const Packet &packet, sockaddr_in clientAddr);
+    void enqueue(Packet &packet, sockaddr_in &clientAddr);
+
     void start();
+
     void stop();
 
 private:
@@ -32,5 +40,7 @@ private:
     std::condition_variable cond;
     std::vector<std::thread> threads;
     std::shared_ptr<IProcessingService> processingService;
+    std::shared_ptr<IDiscoveryService> discoveryService;
+    size_t numThreads;
     std::atomic<bool> running;
 };

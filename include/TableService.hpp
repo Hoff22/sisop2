@@ -13,7 +13,7 @@ class TableService {
 public:
     TableService(std::shared_ptr<ITableOutputObserver> observer);
 
-    ClientInfo& getOrInsert(uint32_t ip, uint16_t port);
+    ClientInfo& getOrInsertClient(uint32_t ip, uint16_t port);
     bool isDuplicate(uint32_t ip, uint16_t port, uint32_t seqn) const;
     void update(uint32_t ip, uint16_t port, uint32_t seqn, uint64_t newSum, uint32_t value);
 

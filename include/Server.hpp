@@ -18,5 +18,4 @@ public:
            std::shared_ptr<IProcessingService> processing);
 
     void start();
-    void startDiscovery() const;
 };
