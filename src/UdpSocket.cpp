@@ -46,7 +46,7 @@ void UdpSocket::bind(uint16_t port) {
 void UdpSocket::addTimeout() const {
     timeval tv{};
     tv.tv_sec = 0;
-    tv.tv_usec = 1000000;
+    tv.tv_usec = 100000;
     setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 }
 

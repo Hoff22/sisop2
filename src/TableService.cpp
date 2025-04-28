@@ -1,6 +1,8 @@
 #include "../include/TableService.hpp"
 #include "../include/TimeUtils.hpp"  // for getFormattedTime
 #include <arpa/inet.h>
+#include <memory>
+#include <mutex>
 
 TableService::TableService(std::shared_ptr<ITableOutputObserver> observer)
     : observer(std::move(observer)) {

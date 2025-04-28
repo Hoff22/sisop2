@@ -2,6 +2,8 @@
 #include "ISocket.hpp"
 #include "TableService.hpp"
 
+#include <atomic>
+
 class ProcessingServiceImpl : public IProcessingService {
 public:
     ProcessingServiceImpl(std::shared_ptr<ISocket> socket,

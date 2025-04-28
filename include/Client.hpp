@@ -5,6 +5,8 @@
 #include <netinet/in.h>
 #include <memory>
 #include <thread>
+#include <queue>
+#include <condition_variable>
 
 class Client {
     std::shared_ptr<ISocket> socket;
