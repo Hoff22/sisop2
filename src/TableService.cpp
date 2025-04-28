@@ -3,32 +3,32 @@
 #include <arpa/inet.h>
 
 TableService::TableService(std::shared_ptr<ITableOutputObserver> observer)
-    : observer(std::move(observer)) {}
-
-ClientInfo& TableService::getOrInsertClient(uint32_t ip, uint16_t port) {
-    std::unique_lock lock(rw_mutex);
-
-    auto key = std::make_pair(ip, port);
-    auto [it, inserted] = clients.try_emplace(key);
-    return it->second;
+    : observer(std::move(observer)) {
 }
 
-bool TableService::isDuplicate(uint32_t ip, uint16_t port, uint32_t seqn) const {
+ClientInfo &TableService::getOrInsertClient(uint32_t ip, uint16_t port) {
+    std::unique_lock lock(rw_mutex);
+
+    const auto key = std::make_pair(ip, port);
+    ClientInfo &info = client_table.getOrInsert(key);
+    return info;
+}
+
+bool TableService::isDuplicate(uint32_t ip, uint16_t port, uint32_t seqn) {
     std::shared_lock lock(rw_mutex);
 
-    auto key = std::make_pair(ip, port);
-    auto it = clients.find(key);
+    const auto key = std::make_pair(ip, port);
+    ClientInfo &info = client_table.getOrInsert(key);
 
-    if (it == clients.end()) return false;
-
-    return seqn <= it->second.last_sequence;
+    return seqn <= info.last_sequence;
 }
 
-void TableService::update(uint32_t ip, uint16_t port, uint32_t seqn, uint64_t newSum, uint32_t value) {
+void TableService::update(uint32_t ip, uint16_t port, const uint32_t seqn, const uint64_t newSum,
+                          const uint32_t value) {
     std::unique_lock lock(rw_mutex);
 
-    auto key = std::make_pair(ip, port);
-    auto& info = clients[key];
+    const auto key = std::make_pair(ip, port);
+    auto &info = client_table.getOrInsert(key);
 
     const bool isDuplicate = (seqn <= info.last_sequence);
     if (!isDuplicate) {
@@ -37,8 +37,8 @@ void TableService::update(uint32_t ip, uint16_t port, uint32_t seqn, uint64_t ne
     }
 
     if (observer) {
-        std::string timestamp = getFormattedTime();
-        std::string ipStr = inet_ntoa(in_addr{ip});
+        const std::string timestamp = getFormattedTime();
+        const std::string ipStr = inet_ntoa(in_addr{ip});
 
         observer->onRequestProcessed(
             timestamp,
