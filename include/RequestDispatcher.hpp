@@ -5,26 +5,23 @@
 #include "IProcessingService.hpp"
 
 #include <thread>
-#include <queue>
+#include <vector>
 #include <mutex>
 #include <condition_variable>
-#include <vector>
+#include <optional>
 #include <atomic>
-
 
 class RequestDispatcher {
 public:
     RequestDispatcher(std::shared_ptr<IProcessingService> processingService,
                       std::shared_ptr<IDiscoveryService> discoveryService,
-                      size_t numThreads = 8
-    );
+                      size_t numThreads = 8);
 
     ~RequestDispatcher();
 
-    void enqueue(Packet &packet, sockaddr_in &clientAddr);
+    void enqueue(Packet& packet, sockaddr_in& clientAddr);
 
     void start();
-
     void stop();
 
 private:
@@ -35,12 +32,17 @@ private:
         sockaddr_in clientAddr;
     };
 
-    std::queue<Request> queue;
     std::mutex mutex;
     std::condition_variable cond;
     std::vector<std::thread> threads;
+
     std::shared_ptr<IProcessingService> processingService;
     std::shared_ptr<IDiscoveryService> discoveryService;
     size_t numThreads;
     std::atomic<bool> running;
+
+    std::vector<std::optional<Request>> buffer;
+    size_t head = 0;
+    size_t tail = 0;
+    size_t bufferCapacity;
 };

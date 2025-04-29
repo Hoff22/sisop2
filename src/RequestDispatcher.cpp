@@ -1,14 +1,18 @@
 #include "../include/RequestDispatcher.hpp"
-
 #include <iostream>
+#include <optional>
 
 RequestDispatcher::RequestDispatcher(std::shared_ptr<IProcessingService> processingService,
-                                     std::shared_ptr<IDiscoveryService> discoveryService, const size_t numThreads)
+                                     std::shared_ptr<IDiscoveryService> discoveryService,
+                                     const size_t numThreads)
     : processingService(std::move(processingService)),
       discoveryService(std::move(discoveryService)),
       numThreads(numThreads),
-      running(false) {
+      running(false),
+      bufferCapacity(100)
+{
     threads.reserve(numThreads);
+    buffer.resize(bufferCapacity);
 }
 
 RequestDispatcher::~RequestDispatcher() {
@@ -36,29 +40,42 @@ void RequestDispatcher::stop() {
     }
 }
 
-
-void RequestDispatcher::enqueue(Packet & packet, sockaddr_in &clientAddr) {
+void RequestDispatcher::enqueue(Packet& packet, sockaddr_in& clientAddr) {
     std::lock_guard<std::mutex> lock(mutex);
-    queue.push({std::move(packet), clientAddr});
+
+    size_t next_tail = (tail + 1) % bufferCapacity;
+    if (next_tail == head) {
+        std::cerr << "RequestDispatcher Ring Buffer FULL\n";
+        exit(1);
+    }
+
+    buffer[tail] = Request{std::move(packet), clientAddr};
+    tail = next_tail;
+
     cond.notify_one();
 }
 
-
 void RequestDispatcher::worker() {
-    while (running) {
-        Request request; {
+    while (true) {
+        std::optional<Request> request_opt;
+        {
             std::unique_lock<std::mutex> lock(mutex);
-            cond.wait(lock, [&]() { return !queue.empty() || !running; });
+            cond.wait(lock, [&]() { return head != tail || !running; });
 
-            if (!running && queue.empty()) return;
+            if (!running && head == tail) return;
 
-            request = queue.front();
-            queue.pop();
+            request_opt = std::move(buffer[head]);
+            buffer[head].reset();
+            head = (head + 1) % bufferCapacity;
         }
-        if (request.packet.type == PacketType::REQUEST) {
-            processingService->handleRequest(request.packet, request.clientAddr);
-        } else if (request.packet.type == PacketType::DISCOVERY) {
-            discoveryService->handleRequest(request.clientAddr);
+
+        if (request_opt) {
+            Request& request = *request_opt;
+            if (request.packet.type == PacketType::REQUEST) {
+                processingService->handleRequest(request.packet, request.clientAddr);
+            } else if (request.packet.type == PacketType::DISCOVERY) {
+                discoveryService->handleRequest(request.clientAddr);
+            }
         }
     }
 }
