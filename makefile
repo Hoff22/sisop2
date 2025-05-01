@@ -20,7 +20,7 @@ SRCS := $(wildcard $(SRC_DIR)/*.cpp)
 HEADERS := $(wildcard $(INC_DIR)/*.hpp)
 
 CLIENT_SRCS := $(SRC_DIR)/main_client.cpp $(SRC_DIR)/Client.cpp
-SERVER_SRCS := $(SRC_DIR)/main_server.cpp $(SRC_DIR)/server.cpp
+SERVER_SRCS := $(SRC_DIR)/main_server.cpp $(SRC_DIR)/Server.cpp
 
 COMMON_SRCS := $(filter-out $(CLIENT_SRCS) $(SERVER_SRCS), $(SRCS))
 

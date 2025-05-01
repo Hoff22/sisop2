@@ -1,21 +1,15 @@
 #pragma once
 #include "ISocket.hpp"
-#include "IDiscoveryService.hpp"
-#include "IProcessingService.hpp"
 #include "RequestDispatcher.hpp"
 #include <memory>
 
 class Server {
     std::shared_ptr<ISocket> socket;
-    std::shared_ptr<IDiscoveryService> discoveryService;
-    std::shared_ptr<IProcessingService> processingService;
-
-    RequestDispatcher dispatcher;
+    const std::shared_ptr<RequestDispatcher> dispatcher;
 
 public:
     Server(std::shared_ptr<ISocket> socket,
-           std::shared_ptr<IDiscoveryService> discovery,
-           std::shared_ptr<IProcessingService> processing);
+           const std::shared_ptr<RequestDispatcher>& request_dispatcher);
 
     void start();
 };

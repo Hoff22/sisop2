@@ -26,8 +26,9 @@ int main(int argc, char* argv[]) {
 
         const auto discovery = std::make_shared<DiscoveryServiceImpl>(socket, table);
         const auto processing = std::make_shared<ProcessingServiceImpl>(socket, table);
+        const auto request_dispatcher = std::make_shared<RequestDispatcher>(processing, discovery, 4);
 
-        Server server(socket, discovery, processing);
+        Server server(socket, request_dispatcher);
         server.start();
 
     } catch (const std::exception& e) {

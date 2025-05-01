@@ -1,3 +1,4 @@
+#pragma once
 #include "IProcessingService.hpp"
 #include "ISocket.hpp"
 #include "TableService.hpp"
