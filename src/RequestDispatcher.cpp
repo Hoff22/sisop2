@@ -41,7 +41,8 @@ void RequestDispatcher::stop() {
 }
 
 void RequestDispatcher::enqueue(Packet& packet, sockaddr_in& clientAddr) {
-    std::lock_guard<std::mutex> lock(mutex);
+    // Since we have only one writer thread, it is theoretically safe to no use a mutex here...
+    //std::lock_guard<std::mutex> lock(mutex);
 
     size_t next_tail = (tail + 1) % bufferCapacity;
     if (next_tail == head) {
