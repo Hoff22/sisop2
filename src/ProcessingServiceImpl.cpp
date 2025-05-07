@@ -8,33 +8,37 @@ ProcessingServiceImpl::ProcessingServiceImpl(std::shared_ptr<ISocket> socket,
                                              std::shared_ptr<TableService> table)
     : socket(std::move(socket)), table(std::move(table)) {}
 
-void ProcessingServiceImpl::handleRequest(const Packet& request, const sockaddr_in& addr) {
+void ProcessingServiceImpl::handleRequest(const Packet &request, const sockaddr_in &addr)
+{
     const uint32_t ip = addr.sin_addr.s_addr;
     const uint16_t port = ntohs(addr.sin_port);
 
     const bool isDup = table->isDuplicate(ip, port, request.seqn);
 
-    //TODO change this to be done only by the discovery service
-    const ClientInfo &info = table->getOrInsertClient(ip, port);
+    // TODO change this to be done only by the discovery service
+    const ClientInfo &info = table->getClientInfo(ip, port);
 
     uint32_t ackSeqn;
     uint64_t ackSum;
 
-    if (isDup) {
+    if (isDup)
+    {
         // Req with seqn already processed, send latest state to the client
         ackSeqn = info.last_sequence;
-        ackSum  = info.last_sum;
+        ackSum = info.last_sum;
 
         // Notify InterfaceService with flag isDuplicate
-        table->update(ip, port, request.seqn, ackSum, request.request.value);  // não altera estado real
-    } else {
+        table->update(ip, port, request.seqn, ackSum, request.request.value, totalRequests); // não altera estado real
+    }
+    else
+    {
         ++totalRequests;
         totalSum += request.request.value;
 
         ackSeqn = request.seqn;
         ackSum = totalSum;
 
-        table->update(ip, port, ackSeqn, ackSum, request.request.value);
+        table->update(ip, port, ackSeqn, ackSum, request.request.value, totalRequests);
     }
 
     Packet ack(PacketType::REQUEST_ACK, ackSeqn);

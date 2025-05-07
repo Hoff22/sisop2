@@ -7,8 +7,6 @@ It ensures reliable communication over an unreliable protocol (UDP) with timeout
 
 ---
 
-smallchange2
-
 ## How to Compile
 
 Use the provided `Makefile`.
