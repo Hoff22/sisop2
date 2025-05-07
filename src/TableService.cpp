@@ -9,28 +9,21 @@ TableService::TableService(std::shared_ptr<ITableOutputObserver> observer)
 }
 
 ClientInfo &TableService::getOrInsertClient(uint32_t ip, uint16_t port) {
-    std::unique_lock lock(rw_mutex);
-
     const auto key = std::make_pair(ip, port);
-    ClientInfo &info = client_table.getOrInsert(key);
+    ClientInfo &info = client_table.getOrInsert(key, rw_mutex);
     return info;
 }
 
 bool TableService::isDuplicate(uint32_t ip, uint16_t port, uint32_t seqn) {
-    std::shared_lock lock(rw_mutex);
-
     const auto key = std::make_pair(ip, port);
-    ClientInfo &info = client_table.getOrInsert(key);
-
+    const ClientInfo &info = client_table.getOrInsert(key, rw_mutex);
     return seqn <= info.last_sequence;
 }
 
 void TableService::update(uint32_t ip, uint16_t port, const uint32_t seqn, const uint64_t newSum,
                           const uint32_t value) {
-    std::unique_lock lock(rw_mutex);
-
     const auto key = std::make_pair(ip, port);
-    auto &info = client_table.getOrInsert(key);
+    auto &info = client_table.getOrInsert(key, rw_mutex);
 
     const bool isDuplicate = (seqn <= info.last_sequence);
     if (!isDuplicate) {

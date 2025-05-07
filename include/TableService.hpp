@@ -3,10 +3,10 @@
 #include "ITableOutputObserver.hpp"
 #include "ClientInfo.hpp"
 #include <unordered_map>
-#include <shared_mutex>
 #include <utility>
 #include <memory>
 #include <cstdint>
+#include <mutex>
 #include <string>
 
 // The idea here is that since we are working with few clients <= 10, this will have less overhead than using a map.
@@ -18,16 +18,19 @@ struct ClientTable {
     ClientInfo table[maxClients];
     std::pair<uint32_t, uint16_t> client_index[maxClients];
 
-    ClientInfo& getOrInsert(const std::pair<uint32_t, uint16_t> &key) {
+    ClientInfo& getOrInsert(const std::pair<uint32_t, uint16_t> &key, std::mutex& mutex) {
+        std::lock_guard<std::mutex> lock(mutex);
+
         for (int i = 0; i < current_clients; i++) {
             if (client_index[i] == key) {
                 return table[i];
             }
         }
+
         client_index[++current_clients] = key;
         return table[current_clients-1];
-    }
 
+    }
 };
 
 class TableService {
@@ -40,7 +43,7 @@ public:
 
 private:
     ClientTable client_table;
-    mutable std::shared_mutex rw_mutex;
+    mutable std::mutex rw_mutex;
 
     std::shared_ptr<ITableOutputObserver> observer;
 };
