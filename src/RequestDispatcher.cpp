@@ -1,7 +1,6 @@
 #include "../include/RequestDispatcher.hpp"
 #include <iostream>
 #include <optional>
-#include <sstream>
 
 RequestDispatcher::RequestDispatcher(std::shared_ptr<IProcessingService> processingService,
                                      std::shared_ptr<IDiscoveryService> discoveryService,
