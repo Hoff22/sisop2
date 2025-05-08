@@ -11,7 +11,8 @@
 #include <optional>
 #include <atomic>
 
-class RequestDispatcher {
+class RequestDispatcher
+{
 public:
     RequestDispatcher(std::shared_ptr<IProcessingService> processingService,
                       std::shared_ptr<IDiscoveryService> discoveryService,
@@ -19,15 +20,22 @@ public:
 
     ~RequestDispatcher();
 
-    void enqueue(Packet& packet, sockaddr_in& clientAddr);
+    void enqueue(Packet &packet, sockaddr_in &clientAddr);
 
     void start();
     void stop();
 
 private:
+    static constexpr int maxClients = 10;
+    int current_clients = 0;
+    std::mutex in_proc[maxClients];
+    std::pair<uint32_t, uint16_t> client_index[maxClients];
     void worker();
+    int getClientIndex(uint32_t ip, uint16_t port);
+    void setClientIndex(uint32_t ip, uint16_t port);
 
-    struct Request {
+    struct Request
+    {
         Packet packet;
         sockaddr_in clientAddr;
     };
