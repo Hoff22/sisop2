@@ -1,13 +1,17 @@
 #pragma once
 #include <vector>
 #include <cstdint>
+#include "ReplicaInfo.hpp"
 
 enum class PacketType : uint16_t {
-    DISCOVERY = 1,
-    DISCOVERY_ACK = 2,
-    REQUEST = 3,
-    REQUEST_ACK = 4,
-    OTHER = 0
+    OTHER,
+    DISCOVERY,
+    DISCOVERY_ACK,
+    SERVER_DISCOVERY,
+    SERVER_DISCOVERY_ACK,
+    REQUEST,
+    REQUEST_ACK,
+    NUM_TYPES
 };
 
 struct RequestPayload {
@@ -20,6 +24,11 @@ struct AckPayload {
     uint64_t total_sum;
 };
 
+struct ReplicaTableAckPayload {
+    uint32_t table_size;
+    ReplicaInfo* table;
+};
+
 class Packet {
 public:
     PacketType type;
@@ -28,6 +37,7 @@ public:
     union {
         RequestPayload request;
         AckPayload ack;
+        ReplicaTableAckPayload replicaTable;
     };
 
     Packet();

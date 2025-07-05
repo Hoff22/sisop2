@@ -11,6 +11,7 @@ public:
     void open();
     void bind(uint16_t port) override;
     void addTimeout() const;
+    void addMulticast() const;
     void sendTo(const std::vector<uint8_t>& data, const sockaddr_in& to) override;
     std::vector<uint8_t> receiveFrom(sockaddr_in& from) override;
     int getRawSocket() const override { return sockfd; }

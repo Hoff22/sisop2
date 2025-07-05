@@ -4,9 +4,11 @@
 
 RequestDispatcher::RequestDispatcher(std::shared_ptr<IProcessingService> processingService,
                                      std::shared_ptr<IDiscoveryService> discoveryService,
+                                     std::shared_ptr<ServerDiscoveryServiceImpl> serverDiscoveryService,
                                      const size_t numThreads)
     : processingService(std::move(processingService)),
       discoveryService(std::move(discoveryService)),
+      serverDiscoveryService(std::move(serverDiscoveryService)),
       numThreads(numThreads),
       running(false),
       bufferCapacity(100)
@@ -119,6 +121,10 @@ void RequestDispatcher::worker()
             {
                 setClientIndex(ip, port);
                 discoveryService->handleRequest(request.clientAddr);
+            }
+            else if (request.packet.type == PacketType::SERVER_DISCOVERY)
+            {
+                serverDiscoveryService->handleRequest(request.packet, request.clientAddr);
             }
         }
     }

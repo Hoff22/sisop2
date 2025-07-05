@@ -3,6 +3,7 @@
 #include "Packet.hpp"
 #include "IDiscoveryService.hpp"
 #include "IProcessingService.hpp"
+#include "ServerDiscoveryServiceImpl.hpp"
 
 #include <thread>
 #include <vector>
@@ -17,6 +18,7 @@ class RequestDispatcher
 public:
     RequestDispatcher(std::shared_ptr<IProcessingService> processingService,
                       std::shared_ptr<IDiscoveryService> discoveryService,
+                      std::shared_ptr<ServerDiscoveryServiceImpl> serverDiscoveryService,
                       size_t numThreads = 8);
 
     ~RequestDispatcher();
@@ -26,7 +28,7 @@ public:
     void start();
     void stop();
 
-private:
+
     static constexpr int maxClients = 10;
     int current_clients = 0;
     std::mutex in_proc[maxClients];
@@ -47,6 +49,7 @@ private:
 
     std::shared_ptr<IProcessingService> processingService;
     std::shared_ptr<IDiscoveryService> discoveryService;
+    std::shared_ptr<ServerDiscoveryServiceImpl> serverDiscoveryService;
     size_t numThreads;
     std::atomic<bool> running;
 

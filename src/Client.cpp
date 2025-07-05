@@ -18,7 +18,7 @@ bool Client::discover(uint16_t port) {
     sockaddr_in broadcastAddr{};
     broadcastAddr.sin_family = AF_INET;
     broadcastAddr.sin_port = htons(port);
-    broadcastAddr.sin_addr.s_addr = inet_addr("255.255.255.255");
+    broadcastAddr.sin_addr.s_addr = inet_addr("0.0.0.0");
 
     socket->sendTo(data, broadcastAddr);
 

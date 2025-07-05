@@ -60,6 +60,14 @@ void UdpSocket::addTimeout() const
     setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 }
 
+void UdpSocket::addMulticast() const {
+    ip_mreq mreq{};
+    inet_pton(AF_INET, "239.0.0.1", &mreq.imr_multiaddr);
+    mreq.imr_interface.s_addr = INADDR_ANY;
+
+    setsockopt(sockfd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq));
+}
+
 void UdpSocket::sendTo(const std::vector<uint8_t> &data, const sockaddr_in &to)
 {
     ssize_t bytes_sent = sendto(sockfd, data.data(), data.size(), 0,

@@ -4,12 +4,16 @@
 #include <memory>
 
 class Server {
+    int server_id;
     std::shared_ptr<ISocket> socket;
     const std::shared_ptr<RequestDispatcher> dispatcher;
 
+    bool discover(uint16_t port);
+    void worker(std::shared_ptr<ISocket> socket);
+
 public:
-    Server(std::shared_ptr<ISocket> socket,
+    Server(int id, std::shared_ptr<ISocket> socket,
            const std::shared_ptr<RequestDispatcher>& request_dispatcher);
 
-    void start();
+    void start(uint16_t port);
 };
