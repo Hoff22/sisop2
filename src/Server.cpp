@@ -6,6 +6,10 @@
 
 #include "../include/Packet.hpp"
 #include "../include/Server.hpp"
+
+#include <unistd.h>
+#include <netdb.h>
+
 #include "../include/UdpSocket.hpp"
 #include "../include/TimeUtils.hpp"
 #include "../include/RequestDispatcher.hpp"
@@ -29,21 +33,21 @@ void Server::start(uint16_t port) {
 
     dispatcher->start();
 
-        while (true) {
-            sockaddr_in clientAddr{};
-            std::vector<uint8_t> data = socket->receiveFrom(clientAddr);
+    while (true) {
+        sockaddr_in clientAddr{};
+        std::vector<uint8_t> data = socket->receiveFrom(clientAddr);
 
-            if (data.empty()) {
-                continue;
-            }
-
-            try {
-                Packet packet = Packet::deserialize(data);
-                dispatcher->enqueue(packet, clientAddr);
-            } catch (const std::exception &e) {
-                std::cerr << "Failed to deserialize packet: " << e.what() << std::endl;
-            }
+        if (data.empty()) {
+            continue;
         }
+
+        try {
+            Packet packet = Packet::deserialize(data);
+            dispatcher->enqueue(packet, clientAddr);
+        } catch (const std::exception &e) {
+            std::cerr << "Failed to deserialize packet: " << e.what() << std::endl;
+        }
+    }
 }
 
 bool Server::discover(uint16_t port){
@@ -56,22 +60,36 @@ bool Server::discover(uint16_t port){
     sockaddr_in broadcastAddr{};
     broadcastAddr.sin_family = AF_INET;
     broadcastAddr.sin_port = htons(port);
-    broadcastAddr.sin_addr.s_addr = inet_addr("0.0.0.0");
+    broadcastAddr.sin_addr.s_addr = inet_addr("255.255.255.255");
 
     socket->sendTo(data, broadcastAddr);
 
     sockaddr_in serverAddr{};
-    const std::vector<uint8_t> response = socket->receiveFrom(serverAddr);
+
+    std::vector<uint8_t> response;
+    Packet ack;
+    do {
+        response = socket->receiveFrom(serverAddr);
+        std::string received_ip = inet_ntoa(serverAddr.sin_addr);
+
+        if (response.empty()) {
+            break;
+        }
+
+        std::cout << "Received response from: " << received_ip << std::endl;
+        ack = Packet::deserialize(response);
+    } while (ack.type != PacketType::SERVER_DISCOVERY_ACK);
+
     if (response.empty()) {
+        std::cout << "No server answered in the discovering phase" << std::endl;
         return false;
     }
 
     try {
-        if (const Packet ack = Packet::deserialize(response); ack.type == PacketType::SERVER_DISCOVERY_ACK) {
+        if (Packet ack = Packet::deserialize(response); ack.type == PacketType::SERVER_DISCOVERY_ACK) {
 
             auto tableService = dispatcher->serverDiscoveryService->table;
 
-            // TODO: populate ReplicaTable
             for(size_t i = 0; i < ack.replicaTable.table_size; i++){
                 tableService->getOrInsertReplica(ack.replicaTable.table[i].ip, ack.replicaTable.table[i].port, ack.replicaTable.table[i].id);
             }
@@ -80,6 +98,7 @@ bool Server::discover(uint16_t port){
                     << " server_addr " << inet_ntoa(serverAddr.sin_addr) << std::endl;
             return true;
         }
+        std::cout << "Server responded with unexpected PacketType " << inet_ntoa(serverAddr.sin_addr) << std::endl;
     } catch (...) {
         std::cerr << "Failed to parse discovery response." << std::endl;
     }

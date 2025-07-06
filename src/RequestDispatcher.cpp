@@ -107,6 +107,7 @@ void RequestDispatcher::worker()
 
         if (request_opt)
         {
+            std::cout << "I AM PROCESSING A REQUEST" << std::endl;
             Request &request = *request_opt;
             const uint32_t ip = request.clientAddr.sin_addr.s_addr;
             const uint16_t port = ntohs(request.clientAddr.sin_port);
