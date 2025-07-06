@@ -9,7 +9,7 @@ ServerDiscoveryServiceImpl::ServerDiscoveryServiceImpl(std::shared_ptr<ISocket> 
 }
 
 void ServerDiscoveryServiceImpl::handleRequest(const Packet &request, const sockaddr_in &clientAddr) {
-    const uint32_t ip = clientAddr.sin_addr.s_addr;
+    const uint32_t ip = ntohl(clientAddr.sin_addr.s_addr);
     const uint16_t port = ntohs(clientAddr.sin_port);
     const uint32_t id = request.seqn;
 

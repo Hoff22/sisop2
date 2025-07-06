@@ -64,6 +64,8 @@ public:
     ClientInfo &getClientInfo(uint32_t ip, uint16_t port);
     bool isDuplicate(uint32_t ip, uint16_t port, uint32_t seqn);
     void update(uint32_t ip, uint16_t port, uint32_t seqn, uint64_t newSum, uint32_t value, uint64_t numreq);
+    void update_without_observer(uint32_t ip, uint16_t port, uint32_t seqn, uint64_t newSum,
+                          uint64_t numreq);
 
     ClientTable client_table;
 private:

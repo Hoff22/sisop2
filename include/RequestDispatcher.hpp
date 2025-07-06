@@ -13,10 +13,12 @@
 #include <atomic>
 #include <sstream>
 
+#include "ProcessingServiceImpl.hpp"
+
 class RequestDispatcher
 {
 public:
-    RequestDispatcher(std::shared_ptr<IProcessingService> processingService,
+    RequestDispatcher(std::shared_ptr<ProcessingServiceImpl> processingService,
                       std::shared_ptr<IDiscoveryService> discoveryService,
                       std::shared_ptr<ServerDiscoveryServiceImpl> serverDiscoveryService,
                       size_t numThreads = 8);
@@ -47,7 +49,7 @@ public:
     std::condition_variable cond;
     std::vector<std::thread> threads;
 
-    std::shared_ptr<IProcessingService> processingService;
+    std::shared_ptr<ProcessingServiceImpl> processingService;
     std::shared_ptr<IDiscoveryService> discoveryService;
     std::shared_ptr<ServerDiscoveryServiceImpl> serverDiscoveryService;
     size_t numThreads;

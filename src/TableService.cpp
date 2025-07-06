@@ -59,3 +59,18 @@ void TableService::update(uint32_t ip, uint16_t port, const uint32_t seqn, const
             isDuplicate);
     }
 }
+
+void TableService::update_without_observer(uint32_t ip, uint16_t port, const uint32_t seqn, const uint64_t newSum,
+                          const uint64_t numreq)
+{
+    const auto key = std::make_pair(ip, port);
+    auto &info = client_table.getClientInfo(key);
+
+    const bool isDuplicate = (seqn <= info.last_sequence);
+    if (!isDuplicate)
+    {
+        info.last_sequence = seqn;
+        info.last_sum = newSum;
+        info.last_numreq = numreq;
+    }
+}

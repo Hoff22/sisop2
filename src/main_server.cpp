@@ -32,7 +32,7 @@ int main(int argc, char* argv[]) {
         const auto server_discovery = std::make_shared<ServerDiscoveryServiceImpl>(manager_socket, replica_table,
             client_table);
         const auto client_discovery = std::make_shared<DiscoveryServiceImpl>(manager_socket, client_table);
-        const auto processing = std::make_shared<ProcessingServiceImpl>(manager_socket, client_table);
+        const auto processing = std::make_shared<ProcessingServiceImpl>(manager_socket, client_table, replica_table);
 
         const auto request_dispatcher = std::make_shared<RequestDispatcher>(processing, client_discovery,
             server_discovery, 4);

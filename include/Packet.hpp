@@ -13,7 +13,9 @@ enum class PacketType : uint16_t {
     SERVER_DISCOVERY_ACK,
     REQUEST,
     REQUEST_ACK,
-    NUM_TYPES
+    NUM_TYPES,
+    REQUEST_REPLICATION,
+    REQUEST_REPLICATION_ACK,
 };
 
 struct RequestPayload {
@@ -35,6 +37,14 @@ struct ReplicaTableAckPayload {
     std::pair<uint32_t, uint16_t>* client_index;
 };
 
+struct RequestReplicationPayload {
+    uint32_t ip;
+    uint16_t port;
+    uint32_t seqn;
+    uint64_t newSum;
+    uint64_t numreq;
+};
+
 class Packet {
 public:
     PacketType type;
@@ -44,6 +54,7 @@ public:
         RequestPayload request;
         AckPayload ack;
         ReplicaTableAckPayload replicaTable;
+        RequestReplicationPayload requestReplication;
     };
 
     Packet();

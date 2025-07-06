@@ -2,7 +2,7 @@
 #include <iostream>
 #include <optional>
 
-RequestDispatcher::RequestDispatcher(std::shared_ptr<IProcessingService> processingService,
+RequestDispatcher::RequestDispatcher(std::shared_ptr<ProcessingServiceImpl> processingService,
                                      std::shared_ptr<IDiscoveryService> discoveryService,
                                      std::shared_ptr<ServerDiscoveryServiceImpl> serverDiscoveryService,
                                      const size_t numThreads)
@@ -29,6 +29,7 @@ void RequestDispatcher::start()
     {
         threads.emplace_back(&RequestDispatcher::worker, this);
     }
+    // add a thread here to deal with election sending
 }
 
 void RequestDispatcher::stop()
@@ -121,12 +122,13 @@ void RequestDispatcher::worker()
             else if (request.packet.type == PacketType::DISCOVERY)
             {
                 setClientIndex(ip, port);
-                //
                 discoveryService->handleRequest(request.clientAddr);
             }
             else if (request.packet.type == PacketType::SERVER_DISCOVERY)
             {
                 serverDiscoveryService->handleRequest(request.packet, request.clientAddr);
+            } else if (request.packet.type == PacketType::REQUEST_REPLICATION) {
+                processingService->handleUpdateReplicaRequest(request.packet, request.clientAddr);
             }
         }
     }

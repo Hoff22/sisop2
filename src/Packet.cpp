@@ -31,6 +31,9 @@ std::vector<uint8_t> Packet::serialize() const {
                          + replicaTable.client_table_size * sizeof(ClientInfo)
                          + replicaTable.client_table_size * (sizeof(uint32_t) + sizeof(uint16_t)); // client_index array
             break;
+        case PacketType::REQUEST_REPLICATION:
+            payload_size = sizeof(RequestReplicationPayload);
+            break;
         default:
             payload_size = 0;
     }
@@ -112,6 +115,22 @@ std::vector<uint8_t> Packet::serialize() const {
             std::memcpy(buffer.data() + offset, &val_net, sizeof(val_net));
             offset += sizeof(val_net);
         }
+    } else if (type == PacketType::REQUEST_REPLICATION) {
+        uint32_t ip_net = htonl(requestReplication.ip);
+        uint16_t port_net = htons(requestReplication.port);
+        uint32_t seqn_net = htonl(requestReplication.seqn);
+        uint64_t sum_net = htobe64(requestReplication.newSum);
+        uint64_t numreq_net = htobe64(requestReplication.numreq);
+
+        std::memcpy(buffer.data() + offset, &ip_net, sizeof(ip_net));
+        offset += sizeof(ip_net);
+        std::memcpy(buffer.data() + offset, &port_net, sizeof(port_net));
+        offset += sizeof(port_net);
+        std::memcpy(buffer.data() + offset, &seqn_net, sizeof(seqn_net));
+        offset += sizeof(seqn_net);
+        std::memcpy(buffer.data() + offset, &sum_net, sizeof(sum_net));
+        offset += sizeof(sum_net);
+        std::memcpy(buffer.data() + offset, &numreq_net, sizeof(numreq_net));
     }
 
     return buffer;
@@ -244,6 +263,33 @@ Packet Packet::deserialize(const std::vector<uint8_t>& data) {
             packet.replicaTable.client_index[i].first = ntohl(key_net);
             packet.replicaTable.client_index[i].second = ntohs(val_net);
         }
+    } else if (type == PacketType::REQUEST_REPLICATION) {
+        if (data.size() < offset + sizeof(RequestReplicationPayload)) {
+            throw std::runtime_error("Invalid REQUEST_REPLICATION packet size");
+        }
+
+        uint32_t ip_net;
+        uint16_t port_net;
+        uint32_t seqn_net;
+        uint64_t sum_net;
+        uint64_t numreq_net;
+
+        std::memcpy(&ip_net, data.data() + offset, sizeof(ip_net));
+        offset += sizeof(ip_net);
+        std::memcpy(&port_net, data.data() + offset, sizeof(port_net));
+        offset += sizeof(port_net);
+        std::memcpy(&seqn_net, data.data() + offset, sizeof(seqn_net));
+        offset += sizeof(seqn_net);
+        std::memcpy(&sum_net, data.data() + offset, sizeof(sum_net));
+        offset += sizeof(sum_net);
+        std::memcpy(&numreq_net, data.data() + offset, sizeof(numreq_net));
+        offset += sizeof(numreq_net);
+
+        packet.requestReplication.ip = ntohl(ip_net);
+        packet.requestReplication.port = ntohs(port_net);
+        packet.requestReplication.seqn = ntohl(seqn_net);
+        packet.requestReplication.newSum = be64toh(sum_net);
+        packet.requestReplication.numreq = be64toh(numreq_net);
     }
 
     return packet;

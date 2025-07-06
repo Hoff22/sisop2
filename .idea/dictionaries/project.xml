@@ -2,6 +2,7 @@
   <dictionary name="project">
     <words>
       <w>maxline</w>
+      <w>numreq</w>
       <w>seqn</w>
       <w>sisop</w>
       <w>sockfd</w>
