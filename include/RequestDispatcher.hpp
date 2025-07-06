@@ -26,6 +26,10 @@ public:
     ~RequestDispatcher();
 
     void enqueue(Packet &packet, sockaddr_in &clientAddr);
+    void enterA();
+    void exitA();
+    void enterB();
+    void exitB();
 
     void start();
     void stop();
@@ -46,7 +50,9 @@ public:
     };
 
     std::mutex mutex;
+    std::mutex a_b_mutex;
     std::condition_variable cond;
+    std::condition_variable a_b_cv;
     std::vector<std::thread> threads;
 
     std::shared_ptr<ProcessingServiceImpl> processingService;
@@ -59,4 +65,8 @@ public:
     size_t head = 0;
     size_t tail = 0;
     size_t bufferCapacity;
+
+    int active_A = 0;
+    int active_B = 0;
+    int waiting_A = 0;
 };

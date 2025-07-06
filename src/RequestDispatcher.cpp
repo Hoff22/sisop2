@@ -51,9 +51,6 @@ void RequestDispatcher::stop()
 
 void RequestDispatcher::enqueue(Packet &packet, sockaddr_in &clientAddr)
 {
-    // Since we have only one writer thread, it is theoretically safe to no use a mutex here...
-    // std::lock_guard<std::mutex> lock(mutex);
-
     size_t next_tail = (tail + 1) % bufferCapacity;
     if (next_tail == head)
     {
@@ -88,6 +85,36 @@ void RequestDispatcher::setClientIndex(uint32_t ip, uint16_t port)
     client_index[current_clients++] = key;
 }
 
+void RequestDispatcher::enterA()
+{
+    std::unique_lock<std::mutex> lock(a_b_mutex);
+    waiting_A++;
+    a_b_cv.wait(lock, [&] { return active_B == 0; });
+    waiting_A--;
+    active_A++;
+}
+
+void RequestDispatcher::exitA()
+{
+    std::lock_guard<std::mutex> lock(a_b_mutex);
+    active_A--;
+    a_b_cv.notify_all();
+}
+
+void RequestDispatcher::enterB()
+{
+    std::unique_lock<std::mutex> lock(a_b_mutex);
+    a_b_cv.wait(lock, [&] { return waiting_A == 0 && active_A == 0; });
+    active_B++;
+}
+
+void RequestDispatcher::exitB()
+{
+    std::lock_guard<std::mutex> lock(a_b_mutex);
+    active_B--;
+    a_b_cv.notify_all();
+}
+
 void RequestDispatcher::worker()
 {
     while (true)
@@ -95,8 +122,7 @@ void RequestDispatcher::worker()
         std::optional<Request> request_opt;
         {
             std::unique_lock<std::mutex> lock(mutex);
-            cond.wait(lock, [&]()
-                      { return head != tail || !running; });
+            cond.wait(lock, [&]() { return head != tail || !running; });
 
             if (!running && head == tail)
                 return;
@@ -108,27 +134,38 @@ void RequestDispatcher::worker()
 
         if (request_opt)
         {
-            std::cout << "I AM PROCESSING A REQUEST" << std::endl;
             Request &request = *request_opt;
             const uint32_t ip = request.clientAddr.sin_addr.s_addr;
             const uint16_t port = ntohs(request.clientAddr.sin_port);
-            if (request.packet.type == PacketType::REQUEST)
+
+            if (request.packet.type == PacketType::SERVER_DISCOVERY)
             {
-                int client_idx = getClientIndex(ip, port);
-                in_proc[client_idx].lock();
-                processingService->handleRequest(request.packet, request.clientAddr);
-                in_proc[client_idx].unlock();
-            }
-            else if (request.packet.type == PacketType::DISCOVERY)
-            {
-                setClientIndex(ip, port);
-                discoveryService->handleRequest(request.clientAddr);
-            }
-            else if (request.packet.type == PacketType::SERVER_DISCOVERY)
-            {
+                enterA();
                 serverDiscoveryService->handleRequest(request.packet, request.clientAddr);
-            } else if (request.packet.type == PacketType::REQUEST_REPLICATION) {
-                processingService->handleUpdateReplicaRequest(request.packet, request.clientAddr);
+                exitA();
+            }
+            else
+            {
+                enterB();
+
+                if (request.packet.type == PacketType::REQUEST)
+                {
+                    int client_idx = getClientIndex(ip, port);
+                    in_proc[client_idx].lock();
+                    processingService->handleRequest(request.packet, request.clientAddr);
+                    in_proc[client_idx].unlock();
+                }
+                else if (request.packet.type == PacketType::DISCOVERY)
+                {
+                    setClientIndex(ip, port);
+                    discoveryService->handleRequest(request.clientAddr);
+                }
+                else if (request.packet.type == PacketType::REQUEST_REPLICATION)
+                {
+                    processingService->handleUpdateReplicaRequest(request.packet, request.clientAddr);
+                }
+
+                exitB();
             }
         }
     }
