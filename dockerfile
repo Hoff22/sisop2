@@ -1,13 +1,13 @@
+# Dockerfile
+
 # Use a minimal C++-friendly base
 FROM gcc:13
 
+# Set the working directory
 WORKDIR /app
+
+# Copy files to have a version in the image,
+# but we will override them with volumes for development.
 COPY src src
 COPY include include
 COPY makefile .
-
-# Compile the server
-RUN make debug
-
-# Run the server on container start
-CMD ["./bin/debug/server", "4040", "42"]

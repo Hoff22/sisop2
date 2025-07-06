@@ -1,6 +1,8 @@
 #pragma once
 #include <vector>
 #include <cstdint>
+
+#include "ClientInfo.hpp"
 #include "ReplicaInfo.hpp"
 
 enum class PacketType : uint16_t {
@@ -25,8 +27,12 @@ struct AckPayload {
 };
 
 struct ReplicaTableAckPayload {
-    uint32_t table_size;
-    ReplicaInfo* table;
+    uint32_t replica_table_size;
+    ReplicaInfo* replica_table;
+
+    int client_table_size;
+    ClientInfo* client_table;
+    std::pair<uint32_t, uint16_t>* client_index;
 };
 
 class Packet {

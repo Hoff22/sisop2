@@ -26,15 +26,18 @@ int main(int argc, char* argv[]) {
         manager_socket->addTimeout();
 
         auto interface = std::make_shared<InterfaceService>();
-        auto client_table = std::make_shared<TableService>(interface);
         auto replica_table = std::make_shared<ReplicaTableService>();
+        auto client_table = std::make_shared<TableService>(interface);
 
-        const auto server_discovery = std::make_shared<ServerDiscoveryServiceImpl>(manager_socket, replica_table);
+        const auto server_discovery = std::make_shared<ServerDiscoveryServiceImpl>(manager_socket, replica_table,
+            client_table);
         const auto client_discovery = std::make_shared<DiscoveryServiceImpl>(manager_socket, client_table);
         const auto processing = std::make_shared<ProcessingServiceImpl>(manager_socket, client_table);
-        const auto request_dispatcher = std::make_shared<RequestDispatcher>(processing, client_discovery, server_discovery, 4);
 
-        Server server(std::stoi(argv[2]), manager_socket, request_dispatcher);
+        const auto request_dispatcher = std::make_shared<RequestDispatcher>(processing, client_discovery,
+            server_discovery, 4);
+
+        Server server(std::stoi(argv[2]), manager_socket, request_dispatcher, client_table);
         server.start(port);
 
     } catch (const std::exception& e) {

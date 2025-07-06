@@ -15,9 +15,12 @@
 #include "../include/RequestDispatcher.hpp"
 
 Server::Server(int id, std::shared_ptr<ISocket> socket,
-               const std::shared_ptr<RequestDispatcher>& request_dispatcher)
-    : server_id(id), socket(std::move(socket)),
-      dispatcher(request_dispatcher)
+               const std::shared_ptr<RequestDispatcher>& request_dispatcher,
+               std::shared_ptr<TableService> client_table)
+    : server_id(id),
+      socket(std::move(socket)),
+      dispatcher(request_dispatcher),
+      client_table(std::move(client_table))
 {
 }
 
@@ -88,10 +91,17 @@ bool Server::discover(uint16_t port){
     try {
         if (Packet ack = Packet::deserialize(response); ack.type == PacketType::SERVER_DISCOVERY_ACK) {
 
-            auto tableService = dispatcher->serverDiscoveryService->table;
+            //fill the ReplicaTable
+            const auto tableService = dispatcher->serverDiscoveryService->replica_table;
 
-            for(size_t i = 0; i < ack.replicaTable.table_size; i++){
-                tableService->getOrInsertReplica(ack.replicaTable.table[i].ip, ack.replicaTable.table[i].port, ack.replicaTable.table[i].id);
+            for (size_t i = 0; i < ack.replicaTable.replica_table_size; i++){
+                tableService->getOrInsertReplica(ack.replicaTable.replica_table[i].ip, ack.replicaTable.replica_table[i].port, ack.replicaTable.replica_table[i].id);
+            }
+
+            //fill the ClientTable
+            for (int i = 0; i < ack.replicaTable.client_table_size; i++) {
+                client_table->client_table.table[i] = ack.replicaTable.client_table[i];
+                client_table->client_table.client_index[i] = ack.replicaTable.client_index[i];
             }
 
             std::cout << getFormattedTime()

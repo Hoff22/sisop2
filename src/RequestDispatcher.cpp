@@ -121,6 +121,7 @@ void RequestDispatcher::worker()
             else if (request.packet.type == PacketType::DISCOVERY)
             {
                 setClientIndex(ip, port);
+                //
                 discoveryService->handleRequest(request.clientAddr);
             }
             else if (request.packet.type == PacketType::SERVER_DISCOVERY)

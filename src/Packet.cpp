@@ -25,7 +25,11 @@ std::vector<uint8_t> Packet::serialize() const {
             payload_size = sizeof(AckPayload);
             break;
         case PacketType::SERVER_DISCOVERY_ACK:
-            payload_size = sizeof(uint32_t) + replicaTable.table_size * sizeof(ReplicaInfo);
+            payload_size = sizeof(uint32_t) // replica_table_size
+                         + replicaTable.replica_table_size * sizeof(ReplicaInfo)
+                         + sizeof(int) // client_table_size
+                         + replicaTable.client_table_size * sizeof(ClientInfo)
+                         + replicaTable.client_table_size * (sizeof(uint32_t) + sizeof(uint16_t)); // client_index array
             break;
         default:
             payload_size = 0;
@@ -34,7 +38,7 @@ std::vector<uint8_t> Packet::serialize() const {
     buffer.resize(sizeof(uint16_t) + sizeof(uint32_t) + payload_size);
     size_t offset = 0;
 
-    // Type
+    // Packet type
     uint16_t type_net = htons(static_cast<uint16_t>(type));
     std::memcpy(buffer.data() + offset, &type_net, sizeof(type_net));
     offset += sizeof(type_net);
@@ -60,15 +64,13 @@ std::vector<uint8_t> Packet::serialize() const {
 
         std::memcpy(buffer.data() + offset, &sum_net, sizeof(sum_net));
     } else if (type == PacketType::SERVER_DISCOVERY_ACK) {
-        // First write the table size
-        uint32_t table_size_net = htonl(replicaTable.table_size);
+        // --- Replica table ---
+        uint32_t table_size_net = htonl(replicaTable.replica_table_size);
         std::memcpy(buffer.data() + offset, &table_size_net, sizeof(table_size_net));
         offset += sizeof(table_size_net);
 
-        // Then write each ReplicaInfo
-        for (uint32_t i = 0; i < replicaTable.table_size; ++i) {
-            const ReplicaInfo& info = replicaTable.table[i];
-
+        for (uint32_t i = 0; i < replicaTable.replica_table_size; ++i) {
+            const ReplicaInfo& info = replicaTable.replica_table[i];
             uint32_t ip_net = htonl(info.ip);
             uint16_t port_net = htons(info.port);
             uint16_t id_net = htons(info.id);
@@ -79,6 +81,36 @@ std::vector<uint8_t> Packet::serialize() const {
             offset += sizeof(port_net);
             std::memcpy(buffer.data() + offset, &id_net, sizeof(id_net));
             offset += sizeof(id_net);
+        }
+
+        // --- Client table ---
+        int client_table_size_net = htonl(replicaTable.client_table_size);
+        std::memcpy(buffer.data() + offset, &client_table_size_net, sizeof(client_table_size_net));
+        offset += sizeof(client_table_size_net);
+
+        for (int i = 0; i < replicaTable.client_table_size; ++i) {
+            const ClientInfo& client = replicaTable.client_table[i];
+            uint32_t last_seq_net = htonl(client.last_sequence);
+            uint64_t last_sum_net = htobe64(client.last_sum);
+            uint64_t last_req_net = htobe64(client.last_numreq);
+
+            std::memcpy(buffer.data() + offset, &last_seq_net, sizeof(last_seq_net));
+            offset += sizeof(last_seq_net);
+            std::memcpy(buffer.data() + offset, &last_sum_net, sizeof(last_sum_net));
+            offset += sizeof(last_sum_net);
+            std::memcpy(buffer.data() + offset, &last_req_net, sizeof(last_req_net));
+            offset += sizeof(last_req_net);
+        }
+
+        // --- Client index array ---
+        for (int i = 0; i < replicaTable.client_table_size; ++i) {
+            uint32_t key_net = htonl(replicaTable.client_index[i].first);
+            uint16_t val_net = htons(replicaTable.client_index[i].second);
+
+            std::memcpy(buffer.data() + offset, &key_net, sizeof(key_net));
+            offset += sizeof(key_net);
+            std::memcpy(buffer.data() + offset, &val_net, sizeof(val_net));
+            offset += sizeof(val_net);
         }
     }
 
@@ -130,24 +162,26 @@ Packet Packet::deserialize(const std::vector<uint8_t>& data) {
         packet.ack.num_requests = ntohl(num_reqs_net);
         packet.ack.total_sum = be64toh(sum_net);
     } else if (type == PacketType::SERVER_DISCOVERY_ACK) {
+        // Deserialize replica_table_size
         if (data.size() < offset + sizeof(uint32_t)) {
-            throw std::runtime_error("Invalid SERVER_DISCOVERY_ACK packet size");
+            throw std::runtime_error("Missing replica_table_size");
         }
 
         uint32_t table_size_net;
         std::memcpy(&table_size_net, data.data() + offset, sizeof(table_size_net));
-        packet.replicaTable.table_size = ntohl(table_size_net);
+        packet.replicaTable.replica_table_size = ntohl(table_size_net);
         offset += sizeof(table_size_net);
 
-        size_t expected_size = offset + packet.replicaTable.table_size * sizeof(ReplicaInfo);
-        if (data.size() < expected_size) {
+        // Deserialize replica_table
+        size_t expected_replica_size = packet.replicaTable.replica_table_size * sizeof(ReplicaInfo);
+        if (data.size() < offset + expected_replica_size) {
             throw std::runtime_error("Incomplete ReplicaInfo table in packet");
         }
 
-        packet.replicaTable.table = new ReplicaInfo[packet.replicaTable.table_size];
-
-        for (uint32_t i = 0; i < packet.replicaTable.table_size; ++i) {
+        packet.replicaTable.replica_table = new ReplicaInfo[packet.replicaTable.replica_table_size];
+        for (uint32_t i = 0; i < packet.replicaTable.replica_table_size; ++i) {
             ReplicaInfo info;
+
             std::memcpy(&info.ip, data.data() + offset, sizeof(info.ip));
             info.ip = ntohl(info.ip);
             offset += sizeof(info.ip);
@@ -160,7 +194,55 @@ Packet Packet::deserialize(const std::vector<uint8_t>& data) {
             info.id = ntohs(info.id);
             offset += sizeof(info.id);
 
-            packet.replicaTable.table[i] = info;
+            packet.replicaTable.replica_table[i] = info;
+        }
+
+        // Deserialize client_table_size
+        if (data.size() < offset + sizeof(int)) {
+            throw std::runtime_error("Missing client_table_size");
+        }
+
+        int client_table_size_net;
+        std::memcpy(&client_table_size_net, data.data() + offset, sizeof(client_table_size_net));
+        packet.replicaTable.client_table_size = ntohl(client_table_size_net);
+        offset += sizeof(client_table_size_net);
+
+        // Deserialize client_table
+        packet.replicaTable.client_table = new ClientInfo[packet.replicaTable.client_table_size];
+        for (int i = 0; i < packet.replicaTable.client_table_size; ++i) {
+            ClientInfo info;
+
+            uint32_t last_seq_net;
+            uint64_t last_sum_net;
+            uint64_t last_req_net;
+
+            std::memcpy(&last_seq_net, data.data() + offset, sizeof(last_seq_net));
+            offset += sizeof(last_seq_net);
+            std::memcpy(&last_sum_net, data.data() + offset, sizeof(last_sum_net));
+            offset += sizeof(last_sum_net);
+            std::memcpy(&last_req_net, data.data() + offset, sizeof(last_req_net));
+            offset += sizeof(last_req_net);
+
+            info.last_sequence = ntohl(last_seq_net);
+            info.last_sum = be64toh(last_sum_net);
+            info.last_numreq = be64toh(last_req_net);
+
+            packet.replicaTable.client_table[i] = info;
+        }
+
+        // Deserialize client_index
+        packet.replicaTable.client_index = new std::pair<uint32_t, uint16_t>[packet.replicaTable.client_table_size];
+        for (int i = 0; i < packet.replicaTable.client_table_size; ++i) {
+            uint32_t key_net;
+            uint16_t val_net;
+
+            std::memcpy(&key_net, data.data() + offset, sizeof(key_net));
+            offset += sizeof(key_net);
+            std::memcpy(&val_net, data.data() + offset, sizeof(val_net));
+            offset += sizeof(val_net);
+
+            packet.replicaTable.client_index[i].first = ntohl(key_net);
+            packet.replicaTable.client_index[i].second = ntohs(val_net);
         }
     }
 
