@@ -2,6 +2,7 @@
 
 #include "ITableOutputObserver.hpp"
 #include "ClientInfo.hpp"
+#include <iostream>
 #include <unordered_map>
 #include <utility>
 #include <memory>
@@ -32,7 +33,9 @@ struct ClientTable
             }
         }
 
-        client_index[++current_clients] = key;
+        // std::cout << "adding client to table " << "[" << current_clients << "] " << key.first << "/" << key.second << std::endl;
+
+        client_index[current_clients++] = key;
         return table[current_clients - 1];
     }
 
@@ -62,6 +65,7 @@ public:
 
     ClientInfo &getOrInsertClient(uint32_t ip, uint16_t port);
     ClientInfo &getClientInfo(uint32_t ip, uint16_t port);
+    ClientTable &getTable() { return client_table; }
     bool isDuplicate(uint32_t ip, uint16_t port, uint32_t seqn);
     void update(uint32_t ip, uint16_t port, uint32_t seqn, uint64_t newSum, uint32_t value, uint64_t numreq);
     void update_without_observer(uint32_t ip, uint16_t port, uint32_t seqn, uint64_t newSum,

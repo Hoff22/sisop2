@@ -141,6 +141,7 @@ void RequestDispatcher::worker()
             if (request.packet.type == PacketType::SERVER_DISCOVERY)
             {
                 enterA();
+                std::cout << "[DEBUG] " << PacketString[(uint16_t)request.packet.type] << std::endl;
                 serverDiscoveryService->handleRequest(request.packet, request.clientAddr);
                 exitA();
             }
@@ -150,6 +151,7 @@ void RequestDispatcher::worker()
 
                 if (request.packet.type == PacketType::REQUEST)
                 {
+                    std::cout << "[DEBUG] " << PacketString[(uint16_t)request.packet.type] << std::endl;
                     int client_idx = getClientIndex(ip, port);
                     in_proc[client_idx].lock();
                     processingService->handleRequest(request.packet, request.clientAddr);
@@ -157,12 +159,18 @@ void RequestDispatcher::worker()
                 }
                 else if (request.packet.type == PacketType::DISCOVERY)
                 {
+                    std::cout << "[DEBUG] " << PacketString[(uint16_t)request.packet.type] << std::endl;
                     setClientIndex(ip, port);
                     discoveryService->handleRequest(request.clientAddr);
                 }
                 else if (request.packet.type == PacketType::REQUEST_REPLICATION)
                 {
+                    std::cout << "[DEBUG] " << PacketString[(uint16_t)request.packet.type] << std::endl;
                     processingService->handleUpdateReplicaRequest(request.packet, request.clientAddr);
+                }
+                else if(request.packet.type == PacketType::HEARTBEAT){
+                    std::cout << "[DEBUG] " << PacketString[(uint16_t)request.packet.type] << std::endl;
+                    heartbeatService->resetTimer();
                 }
 
                 exitB();

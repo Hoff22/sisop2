@@ -1,5 +1,6 @@
 #include "../include/Packet.hpp"
 #include "../include/endian_utils.hpp"
+#include <iostream>
 #include <cstring>
 #include <stdexcept>
 #include <cstdint>
@@ -72,11 +73,11 @@ std::vector<uint8_t> Packet::serialize() const {
         std::memcpy(buffer.data() + offset, &table_size_net, sizeof(table_size_net));
         offset += sizeof(table_size_net);
 
-        for (uint32_t i = 0; i < replicaTable.replica_table_size; ++i) {
+        for (uint32_t i = 0; i < replicaTable.replica_table_size; ++i) {            
             const ReplicaInfo& info = replicaTable.replica_table[i];
             uint32_t ip_net = htonl(info.ip);
             uint16_t port_net = htons(info.port);
-            uint16_t id_net = htons(info.id);
+            uint32_t id_net = htonl(info.id);
 
             std::memcpy(buffer.data() + offset, &ip_net, sizeof(ip_net));
             offset += sizeof(ip_net);
@@ -87,7 +88,7 @@ std::vector<uint8_t> Packet::serialize() const {
         }
 
         // --- Client table ---
-        int client_table_size_net = htonl(replicaTable.client_table_size);
+        uint32_t client_table_size_net = htonl(replicaTable.client_table_size);
         std::memcpy(buffer.data() + offset, &client_table_size_net, sizeof(client_table_size_net));
         offset += sizeof(client_table_size_net);
 
@@ -96,6 +97,8 @@ std::vector<uint8_t> Packet::serialize() const {
             uint32_t last_seq_net = htonl(client.last_sequence);
             uint64_t last_sum_net = htobe64(client.last_sum);
             uint64_t last_req_net = htobe64(client.last_numreq);
+
+            // std::cout << "[serialize] " << "current ClientInfo: " << client.last_sequence << "/" << client.last_sum << "/" << client.last_numreq << std::endl;
 
             std::memcpy(buffer.data() + offset, &last_seq_net, sizeof(last_seq_net));
             offset += sizeof(last_seq_net);
@@ -109,6 +112,8 @@ std::vector<uint8_t> Packet::serialize() const {
         for (int i = 0; i < replicaTable.client_table_size; ++i) {
             uint32_t key_net = htonl(replicaTable.client_index[i].first);
             uint16_t val_net = htons(replicaTable.client_index[i].second);
+
+            // std::cout << "[serialize] " << "current ClientIndex: " << replicaTable.client_index[i].first << "/" << replicaTable.client_index[i].second << std::endl;
 
             std::memcpy(buffer.data() + offset, &key_net, sizeof(key_net));
             offset += sizeof(key_net);
@@ -197,6 +202,8 @@ Packet Packet::deserialize(const std::vector<uint8_t>& data) {
             throw std::runtime_error("Incomplete ReplicaInfo table in packet");
         }
 
+        // std::cout << "[deserialize] " << "size of replica table: " << packet.replicaTable.replica_table_size << std::endl;
+
         packet.replicaTable.replica_table = new ReplicaInfo[packet.replicaTable.replica_table_size];
         for (uint32_t i = 0; i < packet.replicaTable.replica_table_size; ++i) {
             ReplicaInfo info;
@@ -210,21 +217,29 @@ Packet Packet::deserialize(const std::vector<uint8_t>& data) {
             offset += sizeof(info.port);
 
             std::memcpy(&info.id, data.data() + offset, sizeof(info.id));
-            info.id = ntohs(info.id);
+            info.id = ntohl(info.id);
             offset += sizeof(info.id);
 
             packet.replicaTable.replica_table[i] = info;
         }
 
         // Deserialize client_table_size
-        if (data.size() < offset + sizeof(int)) {
+        if (data.size() < offset + sizeof(uint32_t)) {
             throw std::runtime_error("Missing client_table_size");
         }
 
-        int client_table_size_net;
+        uint32_t client_table_size_net;
         std::memcpy(&client_table_size_net, data.data() + offset, sizeof(client_table_size_net));
         packet.replicaTable.client_table_size = ntohl(client_table_size_net);
         offset += sizeof(client_table_size_net);
+
+        // std::cout << "[deserialize] " << "size of client table: " << packet.replicaTable.client_table_size << std::endl;
+
+        size_t expected_clientInfoTable_size = packet.replicaTable.client_table_size * sizeof(ClientInfo);
+        if (data.size() < offset + expected_clientInfoTable_size) {
+            std::cout << "client_info_table_size: " << packet.replicaTable.client_table_size << std::endl;
+            throw std::runtime_error("Incomplete ClientInfo table in packet");
+        }
 
         // Deserialize client_table
         packet.replicaTable.client_table = new ClientInfo[packet.replicaTable.client_table_size];
@@ -247,6 +262,11 @@ Packet Packet::deserialize(const std::vector<uint8_t>& data) {
             info.last_numreq = be64toh(last_req_net);
 
             packet.replicaTable.client_table[i] = info;
+        }
+
+        size_t expected_clientIndexTable_size = packet.replicaTable.client_table_size * sizeof(std::pair<uint32_t, uint16_t>);
+        if (data.size() < offset + expected_clientIndexTable_size) {
+            throw std::runtime_error("Incomplete ClientIndex table in packet");
         }
 
         // Deserialize client_index

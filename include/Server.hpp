@@ -2,13 +2,16 @@
 #include "ISocket.hpp"
 #include "RequestDispatcher.hpp"
 #include "TableService.hpp"
+#include "HeartbeatService.hpp"
 #include <memory>
 
 class Server {
+    bool isManager;
     int server_id;
     std::shared_ptr<ISocket> socket;
     const std::shared_ptr<RequestDispatcher> dispatcher;
     std::shared_ptr<TableService> client_table;
+    std::shared_ptr<HeartbeatService> heartbeatService;
 
     bool discover(uint16_t port);
     void worker(std::shared_ptr<ISocket> socket);

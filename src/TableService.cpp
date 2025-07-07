@@ -26,7 +26,7 @@ ClientInfo &TableService::getClientInfo(uint32_t ip, uint16_t port)
 bool TableService::isDuplicate(uint32_t ip, uint16_t port, uint32_t seqn)
 {
     const auto key = std::make_pair(ip, port);
-    const ClientInfo &info = client_table.getOrInsert(key, rw_mutex);
+    const ClientInfo &info = client_table.getClientInfo(key);
     return seqn <= info.last_sequence;
 }
 

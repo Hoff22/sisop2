@@ -1,5 +1,6 @@
 #include "../include/UdpSocket.hpp"
 
+#include <iostream>
 #include <cerrno>
 #include <stdexcept>
 #include <unistd.h>
@@ -21,6 +22,38 @@ UdpSocket::~UdpSocket()
 void UdpSocket::open()
 {
     sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+
+    if (sockfd < 0)
+    {
+        perror("socket");
+        throw std::runtime_error("Failed to create socket");
+    }
+
+    sockaddr_in remote{};
+    remote.sin_family = AF_INET;
+    remote.sin_port = htons(80); // Any port
+    inet_pton(AF_INET, "8.8.8.8", &remote.sin_addr); // Google's DNS
+
+    // Connect UDP socket (no packets sent, but sets default route)
+    if (connect(sockfd, (sockaddr*)&remote, sizeof(remote)) < 0) {
+        perror("connect");
+        close(sockfd);
+    }
+
+    sockaddr_in local{};
+    socklen_t len = sizeof(local);
+    if (getsockname(sockfd, (sockaddr*)&local, &len) < 0) {
+        perror("getsockname");
+        close(sockfd);
+    }
+
+    std::cout << "own ip: " << inet_ntoa(local.sin_addr) << std::endl;
+
+    host_ip = htonl(local.sin_addr.s_addr);
+
+    // idk why
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+
     if (sockfd < 0)
     {
         perror("socket");

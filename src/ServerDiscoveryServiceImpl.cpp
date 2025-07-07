@@ -13,18 +13,22 @@ void ServerDiscoveryServiceImpl::handleRequest(const Packet &request, const sock
     const uint16_t port = ntohs(clientAddr.sin_port);
     const uint32_t id = request.seqn;
 
-    replica_table->getOrInsertReplica(ip, port, id);
-
     Packet ack(PacketType::SERVER_DISCOVERY_ACK, 0);
+    
+    ReplicaTable &t_replica = replica_table->getTable();
 
-    ReplicaTable &t = replica_table->getTable();
+    ack.replicaTable.replica_table_size = t_replica.current_replicas;
+    ack.replicaTable.replica_table      = t_replica.table;
 
-    ack.replicaTable.replica_table_size = t.current_replicas;
-    ack.replicaTable.replica_table      = t.table;
+    ClientTable &t_client = client_table->getTable();
 
-    ack.replicaTable.client_table_size  = client_table->client_table.current_clients;
-    ack.replicaTable.client_table       = client_table->client_table.table;
-    ack.replicaTable.client_index       = client_table->client_table.client_index;
+    ack.replicaTable.client_table_size  = t_client.current_clients;
+    ack.replicaTable.client_table       = t_client.table;
+    ack.replicaTable.client_index       = t_client.client_index;
+    
+    // inserting the NEW server AFTER defining the ack package
+    // so I don't send its own IP to it
+    replica_table->getOrInsertReplica(ip, port, id);
 
     socket->sendTo(ack.serialize(), clientAddr);
 }

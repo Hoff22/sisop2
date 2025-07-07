@@ -5,12 +5,9 @@
 
 #include "../include/Client.hpp"
 
-sockaddr_in replicaToSockaddr(const ReplicaInfo& replica) {
-    sockaddr_in addr{};
-    addr.sin_family = AF_INET;
-    addr.sin_port = ntohs(replica.port);
-    addr.sin_addr.s_addr = ntohl(replica.ip);
-    return addr;
+inline std::string IPv4addrToString(const uint32_t addr){
+    std::string str = std::to_string((htonl(addr)>>24) & 0xFF) + "." + std::to_string((htonl(addr)>>16) & 0xFF) + "." + std::to_string((htonl(addr)>>8) & 0xFF) + "." + std::to_string((htonl(addr)) & 0xFF);
+    return str;
 }
 
 ProcessingServiceImpl::ProcessingServiceImpl(std::shared_ptr<ISocket> socket,
@@ -66,21 +63,24 @@ void ProcessingServiceImpl::handleRequest(const Packet &request, const sockaddr_
     request_replication.requestReplication.seqn = ackSeqn;
     request_replication.requestReplication.newSum = ackSum;
     request_replication.requestReplication.numreq = totalRequests;
-
+    std::cout << "sending replication of request from " << IPv4addrToString(request_replication.requestReplication.ip) << "/" << request_replication.requestReplication.port << std::endl;
 
     std::cout << "starting to send replication message to replicas " << std::endl;
     const auto& replica_table_struct = replica_table->getTable();
     for (int i = 0; i < replica_table_struct.current_replicas; i++) {
         const auto &replica_info = replica_table_struct.table[i];
-        std::cout << "sending message to replica in " <<  inet_ntoa(replicaToSockaddr(replica_info).sin_addr)
+        if(socket->getSocketIp() == replica_info.ip) continue;
+        std::cout << "sending message to replica in " <<  inet_ntoa(replica_info.replicaToSockaddr().sin_addr)
             << std::endl;
 
-        socket->sendTo(request_replication.serialize(), replicaToSockaddr(replica_info));
+        socket->sendTo(request_replication.serialize(), replica_info.replicaToSockaddr());
     }
 }
 
 void ProcessingServiceImpl::handleUpdateReplicaRequest(const Packet& request, const sockaddr_in &addr) const {
-    table->update_without_observer(request.requestReplication.ip, request.requestReplication.ip,
+    // note how ip gets here with NETWROK BYTE ORDER and port DOES NOT!
+    std::cout << "processing replication of request from " << IPv4addrToString(request.requestReplication.ip) << "/" << request.requestReplication.port << std::endl;
+    table->update_without_observer(request.requestReplication.ip, request.requestReplication.port,
         request.requestReplication.seqn, request.requestReplication.newSum, request.requestReplication.numreq);
 }
 

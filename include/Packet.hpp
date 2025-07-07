@@ -1,6 +1,7 @@
 #pragma once
 #include <vector>
 #include <cstdint>
+#include <string>
 
 #include "ClientInfo.hpp"
 #include "ReplicaInfo.hpp"
@@ -16,6 +17,21 @@ enum class PacketType : uint16_t {
     NUM_TYPES,
     REQUEST_REPLICATION,
     REQUEST_REPLICATION_ACK,
+    HEARTBEAT,
+};
+
+static const std::string PacketString[] = {
+    "OTHER",
+    "DISCOVERY",
+    "DISCOVERY_ACK",
+    "SERVER_DISCOVERY",
+    "SERVER_DISCOVERY_ACK",
+    "REQUEST",
+    "REQUEST_ACK",
+    "NUM_TYPES",
+    "REQUEST_REPLICATION",
+    "REQUEST_REPLICATION_ACK",
+    "HEARTBEAT"
 };
 
 struct RequestPayload {
@@ -32,7 +48,7 @@ struct ReplicaTableAckPayload {
     uint32_t replica_table_size;
     ReplicaInfo* replica_table;
 
-    int client_table_size;
+    uint32_t client_table_size;
     ClientInfo* client_table;
     std::pair<uint32_t, uint16_t>* client_index;
 };

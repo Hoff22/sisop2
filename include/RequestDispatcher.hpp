@@ -4,6 +4,7 @@
 #include "IDiscoveryService.hpp"
 #include "IProcessingService.hpp"
 #include "ServerDiscoveryServiceImpl.hpp"
+#include "HeartbeatService.hpp"
 
 #include <thread>
 #include <vector>
@@ -58,6 +59,7 @@ public:
     std::shared_ptr<ProcessingServiceImpl> processingService;
     std::shared_ptr<IDiscoveryService> discoveryService;
     std::shared_ptr<ServerDiscoveryServiceImpl> serverDiscoveryService;
+    std::shared_ptr<HeartbeatService> heartbeatService;
     size_t numThreads;
     std::atomic<bool> running;
 

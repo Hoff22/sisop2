@@ -7,6 +7,7 @@
 #include <mutex>
 #include <string>
 #include <sstream>
+#include <iostream>
 
 struct ReplicaTable
 {
@@ -28,7 +29,9 @@ struct ReplicaTable
             }
         }
 
-        replica_index[++current_replicas] = key;
+        // std::cout << "adding replica: " << key.first << "/" << key.second << "/" << id << std::endl;
+
+        replica_index[current_replicas++] = key;
         return table[current_replicas - 1] = {key.first, key.second, id};
     }
 
