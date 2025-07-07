@@ -15,6 +15,7 @@ public:
 
     void handleRequest(const Packet& request, const sockaddr_in& addr) override;
     void handleUpdateReplicaRequest(const Packet& request, const sockaddr_in &addr) const;
+    void handleElectionRequest(const Packet& request, const sockaddr_in &addr) const;
 
 private:
     std::shared_ptr<ISocket> socket;

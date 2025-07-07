@@ -1,6 +1,6 @@
 # === Compiler & Flags ===
 CXX = g++
-CXXFLAGS = -std=c++17 -Wall -Wextra -pthread
+CXXFLAGS = -std=c++20 -Wall -Wextra -pthread
 
 SRC_DIR = src
 INC_DIR = include

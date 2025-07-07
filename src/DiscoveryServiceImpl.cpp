@@ -14,12 +14,14 @@ inline std::string IPv4addrToString(const uint32_t addr){
     return str;
 }
 
-void DiscoveryServiceImpl::handleRequest(const sockaddr_in &clientAddr) {
+void DiscoveryServiceImpl::handleRequest(const sockaddr_in &clientAddr, bool isManager) {
     const uint32_t ip = clientAddr.sin_addr.s_addr;
     const uint16_t port = ntohs(clientAddr.sin_port);
 
     table->getOrInsertClient(ip, port);
-
-    const Packet ack(PacketType::DISCOVERY_ACK, 0);
-    socket->sendTo(ack.serialize(), clientAddr);
+    
+    if(isManager){
+        const Packet ack(PacketType::DISCOVERY_ACK, 0);
+        socket->sendTo(ack.serialize(), clientAddr);
+    }
 }

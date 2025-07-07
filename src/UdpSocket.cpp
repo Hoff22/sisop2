@@ -93,6 +93,14 @@ void UdpSocket::addTimeout() const
     setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 }
 
+void UdpSocket::addTimeoutElection() const
+{
+    timeval tv{};
+    tv.tv_sec = 2;
+    tv.tv_usec = 0;
+    setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+}
+
 void UdpSocket::addMulticast() const {
     ip_mreq mreq{};
     inet_pton(AF_INET, "239.0.0.1", &mreq.imr_multiaddr);

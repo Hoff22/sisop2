@@ -17,6 +17,8 @@ enum class PacketType : uint16_t {
     NUM_TYPES,
     REQUEST_REPLICATION,
     REQUEST_REPLICATION_ACK,
+    ELECTION,
+    ELECTION_ACK,
     HEARTBEAT,
 };
 
@@ -31,6 +33,8 @@ static const std::string PacketString[] = {
     "NUM_TYPES",
     "REQUEST_REPLICATION",
     "REQUEST_REPLICATION_ACK",
+    "ELECTION",
+    "ELECTION_ACK",
     "HEARTBEAT"
 };
 

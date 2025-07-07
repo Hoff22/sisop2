@@ -1,4 +1,5 @@
-#include "../include/RequestDispatcher.hpp"
+#include "RequestDispatcher.hpp"
+#include "Server.hpp"
 #include <iostream>
 #include <optional>
 
@@ -11,7 +12,8 @@ RequestDispatcher::RequestDispatcher(std::shared_ptr<ProcessingServiceImpl> proc
       serverDiscoveryService(std::move(serverDiscoveryService)),
       numThreads(numThreads),
       running(false),
-      bufferCapacity(100)
+      bufferCapacity(100),
+      semaphore(numThreads)
 {
     threads.reserve(numThreads);
     buffer.resize(bufferCapacity);
@@ -62,6 +64,21 @@ void RequestDispatcher::enqueue(Packet &packet, sockaddr_in &clientAddr)
     tail = next_tail;
 
     cond.notify_one();
+}
+
+void RequestDispatcher::clearQueue(){
+    std::cout << "[DEBUG]" << " starting to clear queue" << std::endl;
+    while(true){
+        std::optional<Request> request_opt;
+        {
+            if(head == tail) return;
+
+            request_opt = std::move(buffer[head]);
+            buffer[head].reset();
+            head = (head + 1) % bufferCapacity;
+        }
+    }
+    std::cout << "[DEBUG]" << " queue cleared" << std::endl;
 }
 
 int RequestDispatcher::getClientIndex(uint32_t ip, uint16_t port)
@@ -140,13 +157,27 @@ void RequestDispatcher::worker()
 
             if (request.packet.type == PacketType::SERVER_DISCOVERY)
             {
+                // semaphore.acquire();
                 enterA();
                 std::cout << "[DEBUG] " << PacketString[(uint16_t)request.packet.type] << std::endl;
                 serverDiscoveryService->handleRequest(request.packet, request.clientAddr);
                 exitA();
+                // semaphore.release();
+            }
+            else if(request.packet.type == PacketType::ELECTION){
+                enterA();
+                // will only enter this if no other worker threads are holding packets
+                // will do election while queue is locked
+                // will then leave
+                std::cout << "[DEBUG] " << PacketString[(uint16_t)request.packet.type] << std::endl;
+                processingService->handleElectionRequest(request.packet, request.clientAddr);
+                server_reference->startElection();
+                // server_reference->endElection();
+                exitA();
             }
             else
             {
+                // semaphore.acquire();
                 enterB();
 
                 if (request.packet.type == PacketType::REQUEST)
@@ -161,9 +192,9 @@ void RequestDispatcher::worker()
                 {
                     std::cout << "[DEBUG] " << PacketString[(uint16_t)request.packet.type] << std::endl;
                     setClientIndex(ip, port);
-                    discoveryService->handleRequest(request.clientAddr);
+                    discoveryService->handleRequest(request.clientAddr, server_reference->isManager);
                 }
-                else if (request.packet.type == PacketType::REQUEST_REPLICATION)
+                else if (request.packet.type == PacketType::REQUEST_REPLICATION and !server_reference->isManager)
                 {
                     std::cout << "[DEBUG] " << PacketString[(uint16_t)request.packet.type] << std::endl;
                     processingService->handleUpdateReplicaRequest(request.packet, request.clientAddr);
@@ -174,6 +205,7 @@ void RequestDispatcher::worker()
                 }
 
                 exitB();
+                // semaphore.release();
             }
         }
     }

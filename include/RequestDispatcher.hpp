@@ -13,8 +13,11 @@
 #include <optional>
 #include <atomic>
 #include <sstream>
+#include <semaphore>
 
 #include "ProcessingServiceImpl.hpp"
+
+class Server;
 
 class RequestDispatcher
 {
@@ -27,6 +30,7 @@ public:
     ~RequestDispatcher();
 
     void enqueue(Packet &packet, sockaddr_in &clientAddr);
+    void clearQueue();
     void enterA();
     void exitA();
     void enterB();
@@ -50,11 +54,14 @@ public:
         sockaddr_in clientAddr;
     };
 
+    std::counting_semaphore<> semaphore;
     std::mutex mutex;
     std::mutex a_b_mutex;
     std::condition_variable cond;
     std::condition_variable a_b_cv;
     std::vector<std::thread> threads;
+
+    Server* server_reference;
 
     std::shared_ptr<ProcessingServiceImpl> processingService;
     std::shared_ptr<IDiscoveryService> discoveryService;

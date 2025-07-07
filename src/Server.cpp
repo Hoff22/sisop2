@@ -5,7 +5,8 @@
 #include <iostream>
 
 #include "../include/Packet.hpp"
-#include "../include/Server.hpp"
+#include "Server.hpp"
+#include "RequestDispatcher.hpp"
 
 #include <unistd.h>
 #include <netdb.h>
@@ -41,14 +42,19 @@ void Server::start(uint16_t port) {
         std::cout << "FUUUUUUUCK" << std::endl;
     }
 
-    heartbeatService = std::make_shared<HeartbeatService>(socket, tableService, &isManager);
+    heartbeatService = std::make_shared<HeartbeatService>(socket, tableService, &isManager, &running_election);
 
     dispatcher->heartbeatService = heartbeatService;
+    dispatcher->server_reference = this;
     dispatcher->start();
 
     std::thread heartbeatThread(&HeartbeatService::start, heartbeatService); 
-
     while (true) {
+        if(running_election){
+            doElection();
+            endElection();
+        }
+
         sockaddr_in clientAddr{};
         std::vector<uint8_t> data = socket->receiveFrom(clientAddr);
 
@@ -62,6 +68,7 @@ void Server::start(uint16_t port) {
         } catch (const std::exception &e) {
             std::cerr << "Failed to deserialize packet: " << e.what() << std::endl;
         }
+
     }
 
     heartbeatThread.join();

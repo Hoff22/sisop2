@@ -5,5 +5,5 @@
 class IDiscoveryService {
 public:
     virtual ~IDiscoveryService() = default;
-    virtual void handleRequest(const sockaddr_in &clientAddr) = 0; // server
+    virtual void handleRequest(const sockaddr_in &clientAddr, bool isManager) = 0; // server
 };

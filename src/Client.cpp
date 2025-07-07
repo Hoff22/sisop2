@@ -62,6 +62,8 @@ void Client::run() {
         while (!acknowledged) {
             socket->sendTo(data, serverAddr);
 
+            std::cout << "[DEBUG] sended data, waiting receive" << std::endl;
+
             sockaddr_in replyAddr{};
             std::vector<uint8_t> response = socket->receiveFrom(replyAddr);
 
@@ -72,21 +74,27 @@ void Client::run() {
             try {
                 const Packet ack = Packet::deserialize(response);
 
-                if (ack.type != PacketType::REQUEST_ACK) {
+                if (ack.type == PacketType::REQUEST_ACK) {
+                    if (ack.seqn == sequence || ack.seqn > sequence) {
+                        {
+                            std::lock_guard<std::mutex> lock(printMutex);
+                            printQueue.emplace(ack, value);
+                        }
+                        printCond.notify_one();
+
+                        acknowledged = true;
+                        sequence++;
+                    }
+                }
+                else if(ack.type == PacketType::DISCOVERY_ACK){
+                    std::cout << "[DEBUG] NEW SERVER " << inet_ntoa(serverAddr.sin_addr) << std::endl;
+                    serverAddr = replyAddr;
+                }
+                else{
                     std::cerr << "Invalid response type." << std::endl;
                     continue;
                 }
 
-                if (ack.seqn == sequence || ack.seqn > sequence) {
-                    {
-                        std::lock_guard<std::mutex> lock(printMutex);
-                        printQueue.emplace(ack, value);
-                    }
-                    printCond.notify_one();
-
-                    acknowledged = true;
-                    sequence++;
-                }
 
             } catch (const std::exception& e) {
                 std::cerr << "Failed to parse ACK: " << e.what() << std::endl;

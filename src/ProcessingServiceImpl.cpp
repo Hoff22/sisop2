@@ -84,3 +84,13 @@ void ProcessingServiceImpl::handleUpdateReplicaRequest(const Packet& request, co
         request.requestReplication.seqn, request.requestReplication.newSum, request.requestReplication.numreq);
 }
 
+void ProcessingServiceImpl::handleElectionRequest(const Packet& request, const sockaddr_in &addr) const{
+    if(socket->getSocketIp() == htonl(addr.sin_addr.s_addr)){
+        std::cout << "received election from myself" << std::endl; 
+        return;
+    }
+    std::cout << "received election from " << inet_ntoa(addr.sin_addr) << std::endl; 
+    Packet ack(PacketType::ELECTION_ACK, 0);
+    socket->sendTo(ack.serialize(), addr);
+}
+

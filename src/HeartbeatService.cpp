@@ -2,8 +2,9 @@
 
 HeartbeatService::HeartbeatService(std::shared_ptr<ISocket> socket,
 		std::shared_ptr<ReplicaTableService> replica_table, 
-		bool* isManager)
+		bool* isManager, bool *running_election)
 	: isManager(isManager),
+	  running_election(running_election),
 	  socket(socket),
 	  replica_table(replica_table),
 	  timepoint(std::chrono::steady_clock::now())
@@ -16,9 +17,17 @@ void HeartbeatService::start(){
 	        if(*isManager){
 	        	sendHeartbeat();
 	        }
-	        else{
+	        else if(!*running_election){
 	        	std::cout << "send election!" << std::endl;
         		// send election
+        		const Packet request_election(PacketType::ELECTION, 0);
+				for(int i = 0; i < replica_table->getTable().current_replicas; i++){
+					const ReplicaInfo &info = replica_table->getTable().table[i];
+					if(socket->getSocketIp() == info.ip){
+			        	socket->sendTo(request_election.serialize(), info.replicaToSockaddr());
+			        	break;
+					}
+				}
         	}
         	resetTimer();
         }
