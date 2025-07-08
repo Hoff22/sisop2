@@ -62,8 +62,6 @@ void Client::run() {
         while (!acknowledged) {
             socket->sendTo(data, serverAddr);
 
-            std::cout << "[DEBUG] sended data, waiting receive" << std::endl;
-
             sockaddr_in replyAddr{};
             std::vector<uint8_t> response = socket->receiveFrom(replyAddr);
 
@@ -87,7 +85,7 @@ void Client::run() {
                     }
                 }
                 else if(ack.type == PacketType::DISCOVERY_ACK){
-                    std::cout << "[DEBUG] NEW SERVER " << inet_ntoa(serverAddr.sin_addr) << std::endl;
+                    // std::cout << "[DEBUG] NEW SERVER " << inet_ntoa(serverAddr.sin_addr) << std::endl;
                     serverAddr = replyAddr;
                 }
                 else{

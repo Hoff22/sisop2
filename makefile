@@ -1,6 +1,6 @@
 # === Compiler & Flags ===
 CXX = g++
-CXXFLAGS = -std=c++20 -Wall -Wextra -pthread
+CXXFLAGS = -std=c++20 -pthread
 
 SRC_DIR = src
 INC_DIR = include
@@ -11,8 +11,8 @@ SERVER = server
 CLIENT = client
 
 # === Build Modes ===
-DEBUG_FLAGS = -g -fsanitize=address -DDEBUG
-RELEASE_FLAGS = -O2
+DEBUG_FLAGS = -Wall -Wextra -g -fsanitize=address -DDEBUG
+RELEASE_FLAGS = -O3
 PERF_FLAGS = -pg
 
 # === Source Files ===

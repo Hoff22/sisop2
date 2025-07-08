@@ -67,7 +67,7 @@ void RequestDispatcher::enqueue(Packet &packet, sockaddr_in &clientAddr)
 }
 
 void RequestDispatcher::clearQueue(){
-    std::cout << "[DEBUG]" << " starting to clear queue" << std::endl;
+    // std::cout << "[DEBUG]" << " starting to clear queue" << std::endl;
     while(true){
         std::optional<Request> request_opt;
         {
@@ -78,12 +78,13 @@ void RequestDispatcher::clearQueue(){
             head = (head + 1) % bufferCapacity;
         }
     }
-    std::cout << "[DEBUG]" << " queue cleared" << std::endl;
+    // std::cout << "[DEBUG]" << " queue cleared" << std::endl;
 }
 
 int RequestDispatcher::getClientIndex(uint32_t ip, uint16_t port)
 {
     const auto key = std::make_pair(ip, port);
+    // std::cout << "key (getClientIndex): " << key.first << "/" << key.second << std::endl;
     for (int i = 0; i < current_clients; i++)
     {
         if (client_index[i] == key)
@@ -106,7 +107,7 @@ void RequestDispatcher::enterA()
 {
     std::unique_lock<std::mutex> lock(a_b_mutex);
     waiting_A++;
-    a_b_cv.wait(lock, [&] { return active_B == 0; });
+    a_b_cv.wait(lock, [&] { return active_B == 0 && active_A == 0; });
     waiting_A--;
     active_A++;
 }
@@ -159,7 +160,7 @@ void RequestDispatcher::worker()
             {
                 // semaphore.acquire();
                 enterA();
-                std::cout << "[DEBUG] " << PacketString[(uint16_t)request.packet.type] << std::endl;
+                // std::cout << "[DEBUG] " << PacketString[(uint16_t)request.packet.type] << std::endl;
                 serverDiscoveryService->handleRequest(request.packet, request.clientAddr);
                 exitA();
                 // semaphore.release();
@@ -169,7 +170,7 @@ void RequestDispatcher::worker()
                 // will only enter this if no other worker threads are holding packets
                 // will do election while queue is locked
                 // will then leave
-                std::cout << "[DEBUG] " << PacketString[(uint16_t)request.packet.type] << std::endl;
+                // std::cout << "[DEBUG] " << PacketString[(uint16_t)request.packet.type] << std::endl;
                 processingService->handleElectionRequest(request.packet, request.clientAddr);
                 server_reference->startElection();
                 // server_reference->endElection();
@@ -182,7 +183,7 @@ void RequestDispatcher::worker()
 
                 if (request.packet.type == PacketType::REQUEST)
                 {
-                    std::cout << "[DEBUG] " << PacketString[(uint16_t)request.packet.type] << std::endl;
+                    // std::cout << "[DEBUG] " << PacketString[(uint16_t)request.packet.type] << std::endl;
                     int client_idx = getClientIndex(ip, port);
                     in_proc[client_idx].lock();
                     processingService->handleRequest(request.packet, request.clientAddr);
@@ -190,17 +191,20 @@ void RequestDispatcher::worker()
                 }
                 else if (request.packet.type == PacketType::DISCOVERY)
                 {
-                    std::cout << "[DEBUG] " << PacketString[(uint16_t)request.packet.type] << std::endl;
+                    // std::cout << "[DEBUG] " << PacketString[(uint16_t)request.packet.type] << std::endl;
                     setClientIndex(ip, port);
                     discoveryService->handleRequest(request.clientAddr, server_reference->isManager);
                 }
                 else if (request.packet.type == PacketType::REQUEST_REPLICATION and !server_reference->isManager)
                 {
-                    std::cout << "[DEBUG] " << PacketString[(uint16_t)request.packet.type] << std::endl;
+                    // std::cout << "[DEBUG] " << PacketString[(uint16_t)request.packet.type] << std::endl;
+                    int client_idx = getClientIndex(request.packet.requestReplication.ip, request.packet.requestReplication.port);
+                    in_proc[client_idx].lock();
                     processingService->handleUpdateReplicaRequest(request.packet, request.clientAddr);
+                    in_proc[client_idx].unlock();
                 }
                 else if(request.packet.type == PacketType::HEARTBEAT){
-                    std::cout << "[DEBUG] " << PacketString[(uint16_t)request.packet.type] << std::endl;
+                    // std::cout << "[DEBUG] " << PacketString[(uint16_t)request.packet.type] << std::endl;
                     heartbeatService->resetTimer();
                 }
 

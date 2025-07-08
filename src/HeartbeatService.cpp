@@ -2,7 +2,7 @@
 
 HeartbeatService::HeartbeatService(std::shared_ptr<ISocket> socket,
 		std::shared_ptr<ReplicaTableService> replica_table, 
-		bool* isManager, bool *running_election)
+		std::atomic<bool>* isManager, std::atomic<bool> *running_election)
 	: isManager(isManager),
 	  running_election(running_election),
 	  socket(socket),
@@ -45,7 +45,8 @@ bool HeartbeatService::checkTimer(){
 	auto now = std::chrono::steady_clock::now();
 	auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - timepoint);
 	// in ms
-	if((elapsed.count() > 1500 && *isManager) || (elapsed.count() > 3000 && !*isManager)) return 1;
+	bool im = (*isManager).load();
+	if((elapsed.count() > 1500 && im) || (elapsed.count() > 3000 && !im)) return 1;
 	return 0;
 }
 void HeartbeatService::resetTimer(){

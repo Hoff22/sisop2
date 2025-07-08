@@ -4,6 +4,7 @@
 #include <arpa/inet.h>
 #include <iostream>
 
+
 #include "../include/Packet.hpp"
 #include "Server.hpp"
 #include "RequestDispatcher.hpp"
@@ -122,12 +123,24 @@ bool Server::discover(uint16_t port){
                 std::cout << "\t" << "[" << i << "] " << ack.replicaTable.replica_table[i].ip << "/" << ack.replicaTable.replica_table[i].port << "/" << ack.replicaTable.replica_table[i].id << std::endl; 
             }
 
+            auto proc_serv = dispatcher->processingService;
+
             // vou me matar
             client_table->client_table.current_clients = ack.replicaTable.client_table_size;
+            dispatcher->current_clients = ack.replicaTable.client_table_size;
+
+            proc_serv->totalSum = 0;
+            proc_serv->totalRequests = 0;
+
             //fill the ClientTable
             for (int i = 0; i < ack.replicaTable.client_table_size; i++) {
                 client_table->client_table.table[i] = ack.replicaTable.client_table[i];
                 client_table->client_table.client_index[i] = ack.replicaTable.client_index[i];
+
+                proc_serv->totalSum = std::max(proc_serv->totalSum.load(), client_table->client_table.table[i].last_sum);
+                proc_serv->totalRequests = std::max(proc_serv->totalRequests.load(), client_table->client_table.table[i].last_numreq);
+
+                dispatcher->client_index[i] = ack.replicaTable.client_index[i];
             }
             
             std::cout << "\t--" << std::endl;

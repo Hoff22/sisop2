@@ -8,6 +8,7 @@ WORKDIR /app
 
 # Copy files to have a version in the image,
 # but we will override them with volumes for development.
+COPY input input
 COPY src src
 COPY include include
 COPY makefile .

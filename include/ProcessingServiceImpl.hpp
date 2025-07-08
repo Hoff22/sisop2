@@ -14,10 +14,9 @@ public:
                           std::shared_ptr<ReplicaTableService> replica_table);
 
     void handleRequest(const Packet& request, const sockaddr_in& addr) override;
-    void handleUpdateReplicaRequest(const Packet& request, const sockaddr_in &addr) const;
+    void handleUpdateReplicaRequest(const Packet& request, const sockaddr_in &addr);
     void handleElectionRequest(const Packet& request, const sockaddr_in &addr) const;
 
-private:
     std::shared_ptr<ISocket> socket;
     std::shared_ptr<TableService> table;
     std::shared_ptr<ReplicaTableService> replica_table;
