@@ -1,15 +1,19 @@
-#include "../include/RequestDispatcher.hpp"
+#include "RequestDispatcher.hpp"
+#include "Server.hpp"
 #include <iostream>
 #include <optional>
 
-RequestDispatcher::RequestDispatcher(std::shared_ptr<IProcessingService> processingService,
+RequestDispatcher::RequestDispatcher(std::shared_ptr<ProcessingServiceImpl> processingService,
                                      std::shared_ptr<IDiscoveryService> discoveryService,
+                                     std::shared_ptr<ServerDiscoveryServiceImpl> serverDiscoveryService,
                                      const size_t numThreads)
     : processingService(std::move(processingService)),
       discoveryService(std::move(discoveryService)),
+      serverDiscoveryService(std::move(serverDiscoveryService)),
       numThreads(numThreads),
       running(false),
-      bufferCapacity(100)
+      bufferCapacity(100),
+      semaphore(numThreads)
 {
     threads.reserve(numThreads);
     buffer.resize(bufferCapacity);
@@ -27,6 +31,7 @@ void RequestDispatcher::start()
     {
         threads.emplace_back(&RequestDispatcher::worker, this);
     }
+    // add a thread here to deal with election sending
 }
 
 void RequestDispatcher::stop()
@@ -48,9 +53,6 @@ void RequestDispatcher::stop()
 
 void RequestDispatcher::enqueue(Packet &packet, sockaddr_in &clientAddr)
 {
-    // Since we have only one writer thread, it is theoretically safe to no use a mutex here...
-    // std::lock_guard<std::mutex> lock(mutex);
-
     size_t next_tail = (tail + 1) % bufferCapacity;
     if (next_tail == head)
     {
@@ -64,9 +66,25 @@ void RequestDispatcher::enqueue(Packet &packet, sockaddr_in &clientAddr)
     cond.notify_one();
 }
 
+void RequestDispatcher::clearQueue(){
+    // std::cout << "[DEBUG]" << " starting to clear queue" << std::endl;
+    while(true){
+        std::optional<Request> request_opt;
+        {
+            if(head == tail) return;
+
+            request_opt = std::move(buffer[head]);
+            buffer[head].reset();
+            head = (head + 1) % bufferCapacity;
+        }
+    }
+    // std::cout << "[DEBUG]" << " queue cleared" << std::endl;
+}
+
 int RequestDispatcher::getClientIndex(uint32_t ip, uint16_t port)
 {
     const auto key = std::make_pair(ip, port);
+    // std::cout << "key (getClientIndex): " << key.first << "/" << key.second << std::endl;
     for (int i = 0; i < current_clients; i++)
     {
         if (client_index[i] == key)
@@ -85,6 +103,36 @@ void RequestDispatcher::setClientIndex(uint32_t ip, uint16_t port)
     client_index[current_clients++] = key;
 }
 
+void RequestDispatcher::enterA()
+{
+    std::unique_lock<std::mutex> lock(a_b_mutex);
+    waiting_A++;
+    a_b_cv.wait(lock, [&] { return active_B == 0 && active_A == 0; });
+    waiting_A--;
+    active_A++;
+}
+
+void RequestDispatcher::exitA()
+{
+    std::lock_guard<std::mutex> lock(a_b_mutex);
+    active_A--;
+    a_b_cv.notify_all();
+}
+
+void RequestDispatcher::enterB()
+{
+    std::unique_lock<std::mutex> lock(a_b_mutex);
+    a_b_cv.wait(lock, [&] { return waiting_A == 0 && active_A == 0; });
+    active_B++;
+}
+
+void RequestDispatcher::exitB()
+{
+    std::lock_guard<std::mutex> lock(a_b_mutex);
+    active_B--;
+    a_b_cv.notify_all();
+}
+
 void RequestDispatcher::worker()
 {
     while (true)
@@ -92,8 +140,7 @@ void RequestDispatcher::worker()
         std::optional<Request> request_opt;
         {
             std::unique_lock<std::mutex> lock(mutex);
-            cond.wait(lock, [&]()
-                      { return head != tail || !running; });
+            cond.wait(lock, [&]() { return head != tail || !running; });
 
             if (!running && head == tail)
                 return;
@@ -108,17 +155,61 @@ void RequestDispatcher::worker()
             Request &request = *request_opt;
             const uint32_t ip = request.clientAddr.sin_addr.s_addr;
             const uint16_t port = ntohs(request.clientAddr.sin_port);
-            if (request.packet.type == PacketType::REQUEST)
+
+            if (request.packet.type == PacketType::SERVER_DISCOVERY)
             {
-                int client_idx = getClientIndex(ip, port);
-                in_proc[client_idx].lock();
-                processingService->handleRequest(request.packet, request.clientAddr);
-                in_proc[client_idx].unlock();
+                // semaphore.acquire();
+                enterA();
+                // std::cout << "[DEBUG] " << PacketString[(uint16_t)request.packet.type] << std::endl;
+                serverDiscoveryService->handleRequest(request.packet, request.clientAddr);
+                exitA();
+                // semaphore.release();
             }
-            else if (request.packet.type == PacketType::DISCOVERY)
+            else if(request.packet.type == PacketType::ELECTION){
+                enterA();
+                // will only enter this if no other worker threads are holding packets
+                // will do election while queue is locked
+                // will then leave
+                // std::cout << "[DEBUG] " << PacketString[(uint16_t)request.packet.type] << std::endl;
+                processingService->handleElectionRequest(request.packet, request.clientAddr);
+                server_reference->startElection();
+                // server_reference->endElection();
+                exitA();
+            }
+            else
             {
-                setClientIndex(ip, port);
-                discoveryService->handleRequest(request.clientAddr);
+                // semaphore.acquire();
+                enterB();
+
+                if (request.packet.type == PacketType::REQUEST)
+                {
+                    // std::cout << "[DEBUG] " << PacketString[(uint16_t)request.packet.type] << std::endl;
+                    int client_idx = getClientIndex(ip, port);
+                    in_proc[client_idx].lock();
+                    processingService->handleRequest(request.packet, request.clientAddr);
+                    in_proc[client_idx].unlock();
+                }
+                else if (request.packet.type == PacketType::DISCOVERY)
+                {
+                    // std::cout << "[DEBUG] " << PacketString[(uint16_t)request.packet.type] << std::endl;
+                    setClientIndex(ip, port);
+                    discoveryService->handleRequest(request.clientAddr, server_reference->isManager);
+                }
+                else if (request.packet.type == PacketType::REQUEST_REPLICATION and !server_reference->isManager)
+                {
+                    // std::cout << "[DEBUG] " << PacketString[(uint16_t)request.packet.type] << std::endl;
+                    int client_idx = getClientIndex(request.packet.requestReplication.ip, request.packet.requestReplication.port);
+                    in_proc[client_idx].lock();
+                    processingService->handleUpdateReplicaRequest(request.packet, request.clientAddr);
+                    in_proc[client_idx].unlock();
+                }
+                else if(request.packet.type == PacketType::HEARTBEAT){
+                    // std::cout << "[DEBUG] " << PacketString[(uint16_t)request.packet.type] << std::endl;
+                    heartbeatService->resetTimer();
+                }
+
+                exitB();
+                // semaphore.release();
             }
         }
     }

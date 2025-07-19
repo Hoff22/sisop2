@@ -1,13 +1,41 @@
 #pragma once
 #include <vector>
 #include <cstdint>
+#include <string>
+
+#include "ClientInfo.hpp"
+#include "ReplicaInfo.hpp"
 
 enum class PacketType : uint16_t {
-    DISCOVERY = 1,
-    DISCOVERY_ACK = 2,
-    REQUEST = 3,
-    REQUEST_ACK = 4,
-    OTHER = 0
+    OTHER,
+    DISCOVERY,
+    DISCOVERY_ACK,
+    SERVER_DISCOVERY,
+    SERVER_DISCOVERY_ACK,
+    REQUEST,
+    REQUEST_ACK,
+    NUM_TYPES,
+    REQUEST_REPLICATION,
+    REQUEST_REPLICATION_ACK,
+    ELECTION,
+    ELECTION_ACK,
+    HEARTBEAT,
+};
+
+static const std::string PacketString[] = {
+    "OTHER",
+    "DISCOVERY",
+    "DISCOVERY_ACK",
+    "SERVER_DISCOVERY",
+    "SERVER_DISCOVERY_ACK",
+    "REQUEST",
+    "REQUEST_ACK",
+    "NUM_TYPES",
+    "REQUEST_REPLICATION",
+    "REQUEST_REPLICATION_ACK",
+    "ELECTION",
+    "ELECTION_ACK",
+    "HEARTBEAT"
 };
 
 struct RequestPayload {
@@ -20,6 +48,23 @@ struct AckPayload {
     uint64_t total_sum;
 };
 
+struct ReplicaTableAckPayload {
+    uint32_t replica_table_size;
+    ReplicaInfo* replica_table;
+
+    uint32_t client_table_size;
+    ClientInfo* client_table;
+    std::pair<uint32_t, uint16_t>* client_index;
+};
+
+struct RequestReplicationPayload {
+    uint32_t ip;
+    uint16_t port;
+    uint32_t seqn;
+    uint64_t newSum;
+    uint64_t numreq;
+};
+
 class Packet {
 public:
     PacketType type;
@@ -28,6 +73,8 @@ public:
     union {
         RequestPayload request;
         AckPayload ack;
+        ReplicaTableAckPayload replicaTable;
+        RequestReplicationPayload requestReplication;
     };
 
     Packet();

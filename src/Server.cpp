@@ -4,25 +4,58 @@
 #include <arpa/inet.h>
 #include <iostream>
 
+
 #include "../include/Packet.hpp"
-#include "../include/Server.hpp"
+#include "Server.hpp"
+#include "RequestDispatcher.hpp"
+
+#include <unistd.h>
+#include <netdb.h>
+
 #include "../include/UdpSocket.hpp"
 #include "../include/TimeUtils.hpp"
 #include "../include/RequestDispatcher.hpp"
 
-Server::Server(std::shared_ptr<ISocket> socket,
-               const std::shared_ptr<RequestDispatcher>& request_dispatcher)
-    : socket(std::move(socket)),
-      dispatcher(request_dispatcher)
+Server::Server(int id, std::shared_ptr<ISocket> socket,
+               const std::shared_ptr<RequestDispatcher>& request_dispatcher,
+               std::shared_ptr<TableService> client_table)
+    : isManager(false),
+      server_id(id),
+      socket(std::move(socket)),
+      dispatcher(request_dispatcher),
+      client_table(std::move(client_table))
 {
 }
 
-void Server::start() {
+void Server::start(uint16_t port) {
     std::cout << getFormattedTime() << " num_reqs 0 total_sum 0" << std::endl;
 
+    // add my own ip port id to the list of servers known
+    const auto tableService = dispatcher->serverDiscoveryService->replica_table;
+    tableService->getOrInsertReplica(socket->getSocketIp(), port, server_id);
+
+    if(discover(port)){
+        isManager = false;
+        std::cout << "connected" << std::endl;
+    }
+    else{
+        isManager = true;
+        std::cout << "FUUUUUUUCK" << std::endl;
+    }
+
+    heartbeatService = std::make_shared<HeartbeatService>(socket, tableService, &isManager, &running_election);
+
+    dispatcher->heartbeatService = heartbeatService;
+    dispatcher->server_reference = this;
     dispatcher->start();
 
+    std::thread heartbeatThread(&HeartbeatService::start, heartbeatService); 
     while (true) {
+        if(running_election){
+            doElection();
+            endElection();
+        }
+
         sockaddr_in clientAddr{};
         std::vector<uint8_t> data = socket->receiveFrom(clientAddr);
 
@@ -36,5 +69,100 @@ void Server::start() {
         } catch (const std::exception &e) {
             std::cerr << "Failed to deserialize packet: " << e.what() << std::endl;
         }
+
     }
+
+    heartbeatThread.join();
+}
+
+bool Server::discover(uint16_t port){
+    const int enable = 1;
+    setsockopt(socket->getRawSocket(), SOL_SOCKET, SO_BROADCAST, &enable, sizeof(enable));
+
+    const Packet discovery(PacketType::SERVER_DISCOVERY, server_id);
+    const auto data = discovery.serialize();
+
+    sockaddr_in broadcastAddr{};
+    broadcastAddr.sin_family = AF_INET;
+    broadcastAddr.sin_port = htons(port);
+    broadcastAddr.sin_addr.s_addr = inet_addr("255.255.255.255");
+
+    socket->sendTo(data, broadcastAddr);
+
+    sockaddr_in serverAddr{};
+
+    std::vector<uint8_t> response;
+    Packet ack;
+    do {
+        response = socket->receiveFrom(serverAddr);
+        std::string received_ip = inet_ntoa(serverAddr.sin_addr);
+
+        if (response.empty()) {
+            break;
+        }
+
+        std::cout << "Received response from: " << received_ip << std::endl;
+        ack = Packet::deserialize(response);
+    } while (ack.type != PacketType::SERVER_DISCOVERY_ACK);
+
+    if (response.empty()) {
+        std::cout << "No server answered in the discovering phase" << std::endl;
+        return false;
+    }
+
+    try {
+        if (ack.type == PacketType::SERVER_DISCOVERY_ACK) {
+
+            //fill the ReplicaTable
+            const auto tableService = dispatcher->serverDiscoveryService->replica_table;
+
+            std::cout << "deserialized received tables: " << std::endl;
+
+            for (size_t i = 0; i < ack.replicaTable.replica_table_size; i++){
+                tableService->getOrInsertReplica(ack.replicaTable.replica_table[i].ip, ack.replicaTable.replica_table[i].port, ack.replicaTable.replica_table[i].id);
+                std::cout << "\t" << "[" << i << "] " << ack.replicaTable.replica_table[i].ip << "/" << ack.replicaTable.replica_table[i].port << "/" << ack.replicaTable.replica_table[i].id << std::endl; 
+            }
+
+            auto proc_serv = dispatcher->processingService;
+
+            // vou me matar
+            client_table->client_table.current_clients = ack.replicaTable.client_table_size;
+            dispatcher->current_clients = ack.replicaTable.client_table_size;
+
+            proc_serv->totalSum = 0;
+            proc_serv->totalRequests = 0;
+
+            //fill the ClientTable
+            for (int i = 0; i < ack.replicaTable.client_table_size; i++) {
+                client_table->client_table.table[i] = ack.replicaTable.client_table[i];
+                client_table->client_table.client_index[i] = ack.replicaTable.client_index[i];
+
+                proc_serv->totalSum = std::max(proc_serv->totalSum.load(), client_table->client_table.table[i].last_sum);
+                proc_serv->totalRequests = std::max(proc_serv->totalRequests.load(), client_table->client_table.table[i].last_numreq);
+
+                dispatcher->client_index[i] = ack.replicaTable.client_index[i];
+            }
+            
+            std::cout << "\t--" << std::endl;
+
+            for (int i = 0; i < ack.replicaTable.client_table_size; i++) {
+                std::cout << "\t" << "[" << i << "] " << client_table->client_table.table[i].last_sequence << "/" << client_table->client_table.table[i].last_sum << "/" << client_table->client_table.table[i].last_numreq << std::endl; 
+            }
+
+            std::cout << "\t--" << std::endl;
+
+            for (int i = 0; i < ack.replicaTable.client_table_size; i++) {
+                std::cout << "\t" << "[" << i << "] " << client_table->client_table.client_index[i].first << "/" << client_table->client_table.client_index[i].second << std::endl; 
+            }
+
+            std::cout << getFormattedTime()
+                    << " server_addr " << inet_ntoa(serverAddr.sin_addr) << std::endl;
+            return true;
+        }
+        std::cout << "Server responded with unexpected PacketType " << inet_ntoa(serverAddr.sin_addr) << std::endl;
+    } catch (...) {
+        std::cerr << "Failed to parse discovery response." << std::endl;
+    }
+
+    return false;
 }

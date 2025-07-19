@@ -5,8 +5,11 @@
 class ISocket {
 public:
     virtual ~ISocket() = default;
+    virtual void addTimeout() const = 0;
+    virtual void addTimeoutElection() const = 0;
     virtual void bind(uint16_t port) = 0;
     virtual void sendTo(const std::vector<uint8_t>& data, const sockaddr_in& to) = 0;
     virtual std::vector<uint8_t> receiveFrom(sockaddr_in& from) = 0;
     virtual int getRawSocket() const = 0;
+    virtual uint32_t getSocketIp() const = 0;
 };

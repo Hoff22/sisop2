@@ -1,5 +1,7 @@
-#include "../include/DiscoveryServiceImpl.hpp"
 #include <arpa/inet.h>
+#include <string>
+#include <iostream>
+#include "../include/DiscoveryServiceImpl.hpp"
 #include "../include/Packet.hpp"
 
 DiscoveryServiceImpl::DiscoveryServiceImpl(std::shared_ptr<ISocket> socket,
@@ -7,12 +9,19 @@ DiscoveryServiceImpl::DiscoveryServiceImpl(std::shared_ptr<ISocket> socket,
     : socket(std::move(socket)), table(std::move(table)) {
 }
 
-void DiscoveryServiceImpl::handleRequest(const sockaddr_in &clientAddr) {
+inline std::string IPv4addrToString(const uint32_t addr){
+    std::string str = std::to_string((htonl(addr)>>24) & 0xFF) + "." + std::to_string((htonl(addr)>>16) & 0xFF) + "." + std::to_string((htonl(addr)>>8) & 0xFF) + "." + std::to_string((htonl(addr)) & 0xFF);
+    return str;
+}
+
+void DiscoveryServiceImpl::handleRequest(const sockaddr_in &clientAddr, bool isManager) {
     const uint32_t ip = clientAddr.sin_addr.s_addr;
     const uint16_t port = ntohs(clientAddr.sin_port);
 
     table->getOrInsertClient(ip, port);
-
-    const Packet ack(PacketType::DISCOVERY_ACK, 0);
-    socket->sendTo(ack.serialize(), clientAddr);
+    
+    if(isManager){
+        const Packet ack(PacketType::DISCOVERY_ACK, 0);
+        socket->sendTo(ack.serialize(), clientAddr);
+    }
 }
